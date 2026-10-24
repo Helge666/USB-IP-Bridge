@@ -1,0 +1,44 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/usbip-protocol",
+    "crates/core",
+    "crates/host",
+    "crates/service",
+    "crates/cli",
+    "gui/src-tauri",
+]
+
+[workspace.package]
+version = "0.1.1"
+edition = "2021"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/Helge666/USB-IP-Bridge"
+
+[workspace.dependencies]
+anyhow = "1.0"
+log = { version = "0.4", features = ["std"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+socket2 = { version = "0.6", features = ["all"] }
+dns-lookup = "4"
+toml = "1.1"
+windows-service = "0.8"
+usbip-protocol = { path = "crates/usbip-protocol" }
+usbipb-core = { path = "crates/core" }
+usbipb-host = { path = "crates/host" }
+
+[workspace.dependencies.windows]
+version = "0.62"
+features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Devices_DeviceAndDriverInstallation",
+    "Win32_Devices_Properties",
+    "Win32_Devices_Usb",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_Threading",
+    "Win32_System_Registry",
+    "Win32_System_SystemInformation",
+]

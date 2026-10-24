@@ -1,0 +1,9 @@
+[package]
+name = "usbip-protocol"
+description = "USB/IP wire protocol (compatible with the Linux kernel usbip implementation)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]

@@ -1,0 +1,17 @@
+# USB-IP-Bridge on a Linux PC that uses an audio interface of a Windows PC
+# (/etc/usb-ip-bridge/config.toml). Usually not needed: devices can be used in the app, or
+# brought here for one program with `usbipb run --device 1397:00d4 -- PROGRAM`.
+api_port = 3243
+
+[[import]]
+host = "192.168.1.10"       # the Windows PC (it has to be paired with this one)
+port = 3242
+vendor_id = 0x1397          # BEHRINGER X18/XR18
+product_id = 0x00d4
+serial = "ABCD1234"
+mode = "manual"          # attach only on request: `usbipb attach` / `usbipb detach`
+auto_reconnect = true   # while attached, reconnect after network breaks
+
+[[never_share]]
+vendor_id = 0x096e          # licence dongle
+product_id = 0x0201

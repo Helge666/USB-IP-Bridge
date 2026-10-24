@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "mainBinaryName": "usb-ip-bridge",
+  "build": {
+    "beforeBuildCommand": "cargo build --release -p usbipb-service -p usbipb"
+  },
+  "bundle": {
+    "targets": [
+      "deb"
+    ],
+    "linux": {
+      "deb": {
+        "section": "utils",
+        "files": {
+          "/usr/bin/usbipb-service": "../../target/release/usbipb-service",
+          "/usr/bin/usbipb": "../../target/release/usbipb",
+          "/usr/lib/systemd/system/usb-ip-bridge.service": "../../packaging/linux/deb/usb-ip-bridge.service",
+          "/usr/lib/modules-load.d/usb-ip-bridge.conf": "../../packaging/linux/deb/modules-load.conf",
+          "/usr/share/usb-ip-bridge/config.toml.example": "../../packaging/linux/deb/config.toml"
+        },
+        "postInstallScript": "../../packaging/linux/deb/postinst",
+        "preRemoveScript": "../../packaging/linux/deb/prerm",
+        "postRemoveScript": "../../packaging/linux/deb/postrm"
+      }
+    }
+  }
+}

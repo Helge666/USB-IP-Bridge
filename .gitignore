@@ -1,0 +1,22 @@
+# Rust
+/target/
+**/target/
+
+# Node / Tauri frontend
+node_modules/
+dist/
+gui/src-tauri/gen/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Local Claude Code settings
+.claude/settings.local.json
+
+# GUI
+gui/node_modules/
+gui/src-tauri/gen/

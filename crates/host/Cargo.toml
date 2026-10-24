@@ -1,0 +1,19 @@
+[package]
+name = "usbipb-host"
+description = "USB-IP-Bridge platform layer: device enumeration, export (Windows/VBoxUSB) and import (Linux/vhci_hcd)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde_json.workspace = true
+anyhow.workspace = true
+log.workspace = true
+socket2.workspace = true
+dns-lookup.workspace = true
+usbip-protocol.workspace = true
+usbipb-core.workspace = true
+
+[target.'cfg(windows)'.dependencies.windows]
+workspace = true

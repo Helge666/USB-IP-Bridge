@@ -1,0 +1,12 @@
+[Unit]
+Description=USB-IP-Bridge (use USB devices of other computers over the network)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/usbipb-service run
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

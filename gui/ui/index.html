@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>USB-IP-Bridge</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1>USB-IP-Bridge</h1>
+      <span id="version" class="muted"></span>
+    </div>
+    <div class="header-right">
+      <button id="help" class="secondary small" data-i18n="helpButton">How it works</button>
+      <select id="language"></select>
+      <div id="service" class="pill"></div>
+    </div>
+  </header>
+
+  <div id="pairing"></div>
+  <div id="alerts"></div>
+
+  <main class="split">
+    <nav class="tree-pane">
+      <label class="filter small"><input type="checkbox" id="onlyShared"> <span data-i18n="onlyShared">Only shared and in use</span></label>
+      <ul id="tree" class="tree" role="tree" tabindex="0"></ul>
+      <button id="addComputer" class="secondary small add" data-i18n="addComputer">+ Add computer</button>
+      <div class="muted small insecure" data-i18n="secureNote">Only paired computers can see and use your devices.</div>
+    </nav>
+    <section id="details" class="details-pane" aria-live="polite"></section>
+  </main>
+
+  <div id="menu" class="menu" role="menu" hidden></div>
+
+  <dialog id="addDialog">
+    <form id="addForm" method="dialog">
+      <h3 data-i18n="addTitle">Add a computer</h3>
+      <p class="muted small" data-i18n="addHelp"></p>
+      <input id="addAddress" autocomplete="off" spellcheck="false">
+      <div id="addError" class="error small"></div>
+      <div class="dialog-buttons">
+        <button type="button" id="addCancel" class="secondary" data-i18n="cancel">Cancel</button>
+        <button type="submit" id="addOk" data-i18n="add">Add</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="welcomeDialog">
+    <form method="dialog">
+      <h3 data-i18n="welcomeTitle">Welcome to USB-IP-Bridge</h3>
+      <div id="welcomeBody" class="welcome"></div>
+      <div class="dialog-buttons">
+        <button type="submit" id="welcomeOk" data-i18n="welcomeOk">Let's go</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="i18n.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

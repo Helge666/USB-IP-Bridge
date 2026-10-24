@@ -1,0 +1,100 @@
+# USB-IP-Bridge built-in device profiles.
+#
+# [[class]]  defaults for a device class (detected from the USB descriptors)
+# [[device]] additions for one device (vendor/product id), merged over the class defaults
+#
+# Own profiles: put *.toml files with the same structure into
+#   Windows: %ProgramData%\USB-IP-Bridge\profiles\
+#   Linux:   /etc/usb-ip-bridge/profiles/
+# Device entries there override built-in ones for the same device.
+#
+# warnings:  data_loss | lockout | network_loss | high_bandwidth | latency_sensitive
+# ready:     audio | midi | video | block | tty | input | driver
+#            (what `usbipb run` waits for before starting the program)
+# reconnect: auto (default) | ask   (ask = never reattach silently after a broken connection)
+
+[[class]]
+class = "audio"
+warnings = ["latency_sensitive"]
+ready = "audio"
+[class.linux_audio]
+# PipeWire: never the default device (keeps system/game audio where it is), 18-channel
+# pro-audio profile, extra buffering against network jitter. 256/256 gave 26 ms round
+# trip without xruns for a USB 2.0 interface on 2.5 GbE.
+never_default = true
+pro_audio = true
+headroom = 256
+period_size = 256
+
+[[class]]
+class = "midi"
+ready = "midi"
+
+[[class]]
+class = "video"
+warnings = ["high_bandwidth", "latency_sensitive"]
+ready = "video"
+
+[[class]]
+class = "storage"
+warnings = ["data_loss"]
+ready = "block"
+reconnect = "ask"
+
+[[class]]
+class = "keyboard"
+warnings = ["lockout"]
+ready = "input"
+
+[[class]]
+class = "mouse"
+warnings = ["lockout"]
+ready = "input"
+
+[[class]]
+class = "hid"
+ready = "input"
+
+[[class]]
+class = "serial"
+ready = "tty"
+
+[[class]]
+class = "network"
+warnings = ["network_loss"]
+
+[[class]]
+class = "bluetooth"
+warnings = ["network_loss", "lockout"]
+
+[[class]]
+class = "printer"
+ready = "driver"
+
+[[class]]
+class = "image"
+ready = "driver"
+
+[[class]]
+class = "smart_card"
+ready = "driver"
+
+[[class]]
+class = "vendor_specific"
+ready = "driver"
+
+# ---------------------------------------------------------------------------- devices
+
+[[device]]
+name = "Behringer X18/XR18"
+vendor_id = 0x1397
+product_id = 0x00d4
+# The Windows driver's control panel keeps the device open.
+blocking_processes_windows = ["X18AudioCplApp.exe"]
+
+[[device]]
+name = "Elgato Facecam"
+vendor_id = 0x0fd9
+product_id = 0x0078
+# Camera Hub keeps the camera open for its picture controls.
+blocking_processes_windows = ["Camera Hub.exe"]

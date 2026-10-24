@@ -1,0 +1,21 @@
+#!/bin/sh
+# USB-IP-Bridge: load the virtual USB host controller, start the service.
+set -e
+if [ "$1" = "configure" ]; then
+    # a configuration to start from (an existing one stays as it is)
+    if [ ! -e /etc/usb-ip-bridge/config.toml ]; then
+        install -d -m 0755 /etc/usb-ip-bridge
+        install -m 0644 /usr/share/usb-ip-bridge/config.toml.example /etc/usb-ip-bridge/config.toml
+    fi
+    modprobe vhci-hcd 2>/dev/null || true
+    # Other computers reach this one on TCP/UDP 3244 (control channel, discovery).
+    if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+        ufw allow 3244 comment "USB-IP-Bridge" >/dev/null || true
+    fi
+    if [ -d /run/systemd/system ]; then
+        systemctl daemon-reload || true
+        systemctl enable usb-ip-bridge.service >/dev/null 2>&1 || true
+        systemctl restart usb-ip-bridge.service || true
+    fi
+fi
+exit 0

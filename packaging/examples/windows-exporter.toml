@@ -1,0 +1,22 @@
+# USB-IP-Bridge on a Windows PC that shares an audio interface
+# (C:\ProgramData\USB-IP-Bridge\config.toml). Usually not needed: devices can be shared in
+# the app. A configuration file is for fixed setups.
+usbip_port = 3242   # 3240 is taken by usbipd-win
+api_port = 3243
+
+[[export]]
+vendor_id = 0x1397          # BEHRINGER X18/XR18
+product_id = 0x00d4
+serial = "ABCD1234"         # optional: only this one, if there are several of the same kind
+allowed_clients = ["192.168.1.20"]   # optional: only these paired computers
+# programs that keep the device open; the app offers to close them when they block sharing
+blocking_processes = ["X18AudioCplApp.exe"]
+
+# never shared, whatever [[export]] says
+[[never_share]]
+vendor_id = 0x17f6          # keyboard
+product_id = 0x0862
+
+[[never_share]]
+vendor_id = 0x13d3          # Bluetooth adapter (mouse)
+product_id = 0x3585

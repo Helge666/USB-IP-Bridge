@@ -1,0 +1,18 @@
+#!/bin/sh
+# USB-IP-Bridge: remove what the service created. "purge" also removes its key, the list of
+# paired computers and the configuration.
+set -e
+case "$1" in
+    remove|purge)
+        # audio rules written by the service (WirePlumber reads them at its next start)
+        rm -f /etc/wireplumber/main.lua.d/51-usb-ip-bridge.lua /etc/wireplumber/wireplumber.conf.d/51-usb-ip-bridge.conf
+        if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+            ufw delete allow 3244 >/dev/null 2>&1 || true
+        fi
+        [ -d /run/systemd/system ] && systemctl daemon-reload || true
+        ;;
+esac
+if [ "$1" = "purge" ]; then
+    rm -rf /var/lib/usb-ip-bridge /etc/usb-ip-bridge
+fi
+exit 0

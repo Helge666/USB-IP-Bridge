@@ -1,0 +1,12 @@
+[package]
+name = "usbipb"
+description = "USB-IP-Bridge command line tool"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+usbipb-core.workspace = true
+usbipb-host.workspace = true

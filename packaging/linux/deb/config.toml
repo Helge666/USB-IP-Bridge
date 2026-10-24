@@ -1,0 +1,10 @@
+# USB-IP-Bridge configuration. Usually nothing needs to be set here: computers find each
+# other in the local network, and devices are shared and used in the app.
+#
+# Computers that are not found automatically (e.g. over a VPN), by name or address:
+# peers = ["workshop-pc", "100.101.102.103"]
+#
+# Devices of this computer that must never be given away (keyboard, licence dongle, ...):
+# [[never_share]]
+# vendor_id = 0x17f6
+# product_id = 0x0862

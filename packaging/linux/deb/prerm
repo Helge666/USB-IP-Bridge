@@ -1,0 +1,7 @@
+#!/bin/sh
+# USB-IP-Bridge: stop the service before its files go away (on removal; an upgrade restarts it).
+set -e
+if [ "$1" = "remove" ] && [ -d /run/systemd/system ]; then
+    systemctl disable --now usb-ip-bridge.service >/dev/null 2>&1 || true
+fi
+exit 0

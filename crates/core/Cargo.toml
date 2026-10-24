@@ -1,0 +1,18 @@
+[package]
+name = "usbipb-core"
+description = "USB-IP-Bridge: version, device model, configuration and local API types"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+log = { workspace = true }
+snow = { version = "0.10.0", default-features = false, features = ["default-resolver", "use-chacha20poly1305", "use-blake2", "use-curve25519", "use-getrandom"] }
+spake2 = "0.4"
+sha2 = "0.10"
+getrandom = "0.2"
