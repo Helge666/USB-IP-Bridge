@@ -274,7 +274,30 @@ Rechner/Gerät, lokale Benutzerrechte, Security-Review, Fuzzing.
 - **v0.1.1 (2026-10-24):** Rechner-Details (Betriebssystem, CPU, Grafik, RAM), automatische
   Sperren für wichtige Geräte plus Sperren/Entsperren per Rechtsklick.
 
-### Als Nächstes
+### v0.2.0 – alle Richtungen
+
+Ziel: Jeder Rechner kann eigene Geräte freigeben **und** Geräte anderer nutzen –
+Windows ↔ Windows, Linux ↔ Linux, Linux → Windows genauso zuverlässig wie heute Windows → Linux.
+
+- **Linux gibt frei:** Kernel-Treiber `usbip-host` (Mainline). Der Dienst bindet ein freigegebenes
+  Gerät erst bei Anfrage an `usbip-host` (wie VBoxUSB unter Windows: lokal nutzbar, solange es
+  niemand holt), nimmt den USB/IP-Handshake an und übergibt den Socket an den Kernel
+  (`usbip_sockfd`); bei Rückgabe wieder an den Originaltreiber. Vorher Speichergeräte aushängen,
+  Sperren und Blockierer (Prozesse mit offenem Gerät) wie unter Windows.
+- **Windows nutzt Geräte anderer:** **usbip-win2** (BSD-2, Treiber WHLK-zertifiziert bzw.
+  Attestation-signiert, Windows 10 1903+). Der Treiber verbindet sich selbst mit dem
+  Exportserver; der Dienst stößt das Einbinden an, überwacht es und gibt zurück. Installer:
+  usbip-win2 bei Bedarf mitinstallieren (wie usbipd-win), sauber deinstallieren.
+- Ausschlüsse: Ein Rechner gibt nie Geräte weiter, die er selbst nur eingebunden hat
+  (vhci unter Linux, usbip-win2-Geräte unter Windows).
+- App und CLI: „Freigeben“, „Geben an“ und „Hierher holen“ auf allen Systemen; `can_export`/
+  `can_import` aus den tatsächlich vorhandenen Treibern statt aus dem Betriebssystem.
+- Testmatrix je Richtung (Windows→Windows, Linux→Linux, Linux→Windows, Windows→Linux) mit
+  Audio (isochron, Vollduplex), MIDI, Video (USB 3), Eingabe, Speicher.
+- Offen zu prüfen: isochrones Audio über usbip-win2 (Vollduplex, Latenz), Zusammenspiel von
+  usbip-win2 und den VBoxUSB-Treibern auf demselben Windows-Rechner.
+
+### Als Nächstes (danach)
 1. Windows-Dienst: beim Stoppen warten, bis verliehene Geräte zurück sind.
 2. Blockierer unter Windows automatisch finden (Prozesse mit offenen Handles auf das Gerät).
 3. Tray-Symbol und Benachrichtigungen (z. B. „XR18 wird von … benutzt“, Kopplungsanfrage).
@@ -285,7 +308,6 @@ Rechner/Gerät, lokale Benutzerrechte, Security-Review, Fuzzing.
 7. Update-Hinweis in der App; CI-Builds der Installer.
 
 ### Später
-- Linux gibt frei, Windows bindet ein (usbip-win2) → alle Richtungen.
 - **Internet**: QUIC, NAT-Traversal, Verschlüsselung des Datenpfads.
 - **macOS**, **Android** (zunächst nur Export), weitere Sprachen.
 
