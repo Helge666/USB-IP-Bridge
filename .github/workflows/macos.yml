@@ -1,0 +1,58 @@
+# Builds and tests USB-IP-Bridge on macOS (Apple Silicon). macOS support is in an early state:
+# this checks that everything compiles and the tests pass, and offers the app, the service and
+# the command line tool for download (unsigned) to try on a Mac.
+name: macOS
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustc --version
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: macos-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: macos-cargo-
+
+      - name: Build
+        run: cargo build --workspace --locked
+
+      - name: Test
+        run: cargo test --workspace --locked
+
+      - name: Build the app (.app, unsigned)
+        working-directory: gui
+        run: |
+          npm ci
+          cargo build --release --locked -p usbipb-service -p usbipb
+          npx tauri build --bundles app --ci
+
+      - name: Collect
+        run: |
+          mkdir -p dist
+          cp target/release/usbipb-service target/release/usbipb dist/
+          ditto -c -k --keepParent target/release/bundle/macos/USB-IP-Bridge.app dist/USB-IP-Bridge.app.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: usb-ip-bridge-macos-arm64
+          path: dist/

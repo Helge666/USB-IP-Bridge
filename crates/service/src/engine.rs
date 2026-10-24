@@ -172,6 +172,9 @@ pub fn hostname() -> String {
     std::env::var("COMPUTERNAME")
         .ok()
         .or_else(|| std::fs::read_to_string("/etc/hostname").ok().map(|s| s.trim().to_string()))
+        // macOS has no /etc/hostname
+        .or_else(|| std::process::Command::new("hostname").output().ok().map(|o| String::from_utf8_lossy(&o.stdout).trim().trim_end_matches(".local").to_string()))
+        .filter(|s| !s.is_empty())
         .unwrap_or_else(|| "unknown".into())
 }
 
@@ -559,7 +562,7 @@ fn block_signals() -> libc_sigset {
         sigemptyset(&mut set);
         sigaddset(&mut set, 2); // SIGINT
         sigaddset(&mut set, 15); // SIGTERM
-        pthread_sigmask(0, &set, std::ptr::null_mut()); // SIG_BLOCK
+        pthread_sigmask(SIG_BLOCK, &set, std::ptr::null_mut());
         set
     }
 }
@@ -576,7 +579,11 @@ fn wait_for_signal(set: &libc_sigset, stop: Arc<AtomicBool>) {
 
 #[cfg(unix)]
 #[allow(non_camel_case_types)]
-type libc_sigset = [u64; 16];
+type libc_sigset = [u64; 16]; // large enough for every platform's sigset_t
+#[cfg(target_os = "linux")]
+const SIG_BLOCK: i32 = 0;
+#[cfg(all(unix, not(target_os = "linux")))]
+const SIG_BLOCK: i32 = 1; // macOS and the BSDs
 #[cfg(unix)]
 extern "C" {
     fn sigemptyset(set: *mut libc_sigset) -> i32;
