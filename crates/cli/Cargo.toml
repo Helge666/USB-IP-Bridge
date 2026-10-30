@@ -10,3 +10,8 @@ repository.workspace = true
 anyhow.workspace = true
 usbipb-core.workspace = true
 usbipb-host.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[target.'cfg(windows)'.dependencies.windows]
+workspace = true

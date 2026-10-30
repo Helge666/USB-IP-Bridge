@@ -9,6 +9,17 @@ pub fn info() -> SystemInfo {
     INFO.get_or_init(read).clone()
 }
 
+/// This computer's name.
+pub fn host_name() -> String {
+    std::env::var("COMPUTERNAME")
+        .ok()
+        .or_else(|| std::fs::read_to_string("/etc/hostname").ok().map(|s| s.trim().to_string()))
+        // macOS has no /etc/hostname
+        .or_else(|| std::process::Command::new("hostname").output().ok().map(|o| String::from_utf8_lossy(&o.stdout).trim().trim_end_matches(".local").to_string()))
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "unknown".into())
+}
+
 fn threads() -> Option<u32> {
     std::thread::available_parallelism().ok().map(|n| n.get() as u32)
 }

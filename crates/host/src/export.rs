@@ -1,13 +1,15 @@
-//! Export server: shares configured devices over USB/IP using VBoxUSB.
+//! Export server: shares configured devices over USB/IP.
 //!
-//! Runs until `stop` is set; accepts any number of clients over time. A device is
-//! captured when a client imports it and handed back to Windows when the session ends,
-//! so the device works locally whenever nobody uses it remotely.
+//! Runs until `stop` is set; accepts any number of clients over time. A device is taken
+//! from this computer only when a client imports it (Windows: VBoxUSB captures it,
+//! Linux: the usbip-host driver takes it) and handed back when the session ends, so the
+//! device works locally whenever nobody uses it remotely.
 
-use super::devices;
-use super::session::{descriptors, run_session};
-use super::vbox::{port_speed, Captured};
+#[cfg(target_os = "linux")]
+use crate::linux::export::{wire_details, Lease};
 use crate::net::configure_keepalive;
+#[cfg(windows)]
+use crate::windows::lease::{wire_details, Lease};
 use anyhow::{bail, Context, Result};
 use std::collections::HashMap;
 use std::io::BufReader;
@@ -24,8 +26,8 @@ use usbipb_core::profiles::Profiles;
 /// Shared state of the export server, read by the local API.
 #[derive(Default)]
 pub struct ExportState {
-    /// bus id -> (client address, stream used to end the session on shutdown, the device
-    /// as it looked before capture - while captured, Windows only shows "VirtualBox USB")
+    /// bus id -> (client address, stream used to end the session, the device as it looked
+    /// before capture - while captured, Windows only shows "VirtualBox USB")
     active: Mutex<HashMap<String, (String, TcpStream, UsbDevice)>>,
     /// device serial or bus id -> (problem, when, client) of the last failed capture
     problems: Mutex<HashMap<String, (String, Instant, String)>>,
@@ -77,25 +79,26 @@ impl ExportState {
     }
 
     pub fn status(&self, config: &Config) -> Vec<ExportStatus> {
-        let devices = devices::list();
+        let devices = crate::list_devices();
         let active = self.active.lock().unwrap();
         config
             .export
             .iter()
             .map(|rule| {
-                let present = devices.iter().find(|d| rule.device.matches(d)).cloned().map(|mut d| {
+                let present = devices.iter().find(|d| d.state == DeviceState::Local && rule.device.matches(d)).cloned().map(|mut d| {
                     d.state = if config.is_blocked(&d) { DeviceState::Blocked } else { DeviceState::Shared };
                     d
                 });
                 let session = active.values().find(|(_, _, d)| rule.device.matches(d));
                 let client = session.map(|(c, _, _)| c.clone());
-                let device = present.or_else(|| {
-                    session.map(|(_, _, d)| {
+                // A lent device is still listed on Linux (bound to usbip-host).
+                let device = session
+                    .map(|(_, _, d)| {
                         let mut d = d.clone();
                         d.state = DeviceState::InUseRemotely;
                         d
                     })
-                });
+                    .or(present);
                 let note = match (&device, &client) {
                     (None, _) => Some("not plugged in".into()),
                     _ => None,
@@ -117,6 +120,7 @@ impl ExportState {
                 }
                 let name_of = |c: Option<&String>| c.and_then(|c| c.parse().ok()).and_then(crate::net::host_name);
                 ExportStatus {
+                    present: device.is_some(),
                     device,
                     rule: rule_name(rule),
                     client_name: name_of(client.as_ref()),
@@ -141,11 +145,12 @@ fn rule_name(rule: &ExportRule) -> String {
     }
 }
 
-/// Devices the given client may import right now.
+/// Devices the given client may import right now (never devices this computer only
+/// uses from another one).
 fn exportable(config: &Config, peer: IpAddr) -> Vec<UsbDevice> {
-    devices::list()
+    crate::list_devices()
         .into_iter()
-        .filter(|d| !config.is_blocked(d))
+        .filter(|d| d.state == DeviceState::Local && !config.is_blocked(d))
         .filter(|d| {
             config.export.iter().any(|r| {
                 r.device.matches(d) && (r.allowed_clients.is_empty() || r.allowed_clients.iter().any(|c| c.parse::<IpAddr>().ok() == Some(peer)))
@@ -156,27 +161,14 @@ fn exportable(config: &Config, peer: IpAddr) -> Vec<UsbDevice> {
 
 /// The device record for the device list, with its interfaces (first alternate setting).
 fn wire_device(d: &UsbDevice) -> (UsbDevice2, Vec<InterfaceInfo>) {
-    let mut parts = d.bus_id.split('-');
-    let busnum = parts.next().and_then(|s| s.parse().ok()).unwrap_or(1);
-    let devnum = parts.next().and_then(|s| s.parse().ok()).unwrap_or(1);
-    let port: u16 = devnum as u16;
-    let speed = match port_speed(&d.platform_id, port) {
-        Some(0) => Speed::Low,
-        Some(2) => Speed::High,
-        Some(3) => Speed::Super,
-        _ => Speed::Full,
-    };
-    let interfaces: Vec<InterfaceInfo> = devices::interfaces(&d.platform_id, port)
-        .into_iter()
-        .map(|(class, subclass, protocol)| InterfaceInfo { class, subclass, protocol })
-        .collect();
+    let (busnum, devnum, speed, interfaces) = wire_details(d);
     let record = UsbDevice2 {
         // The free-text path carries serial, device name, host name and the detected
         // classes (they include what only Windows knows, e.g. the driver's setup class).
         path: crate::net::encode_path(&[
             ("serial", d.serial.as_deref().unwrap_or("")),
             ("name", &d.display_name()),
-            ("host", &std::env::var("COMPUTERNAME").unwrap_or_default()),
+            ("host", &crate::system::host_name()),
             ("classes", &usbipb_core::classes::join_names(&d.classes)),
         ]),
         busid: d.bus_id.clone(),
@@ -201,6 +193,8 @@ type UsbDevice2 = usbip_protocol::UsbDevice;
 pub fn run(config: Arc<Config>, state: Arc<ExportState>, stop: Arc<AtomicBool>) -> Result<()> {
     let listener = TcpListener::bind(("0.0.0.0", config.usbip_port)).with_context(|| format!("bind TCP {}", config.usbip_port))?;
     listener.set_nonblocking(true)?;
+    #[cfg(target_os = "linux")]
+    crate::linux::export::release_leftovers();
     let rules = state.current.lock().unwrap().as_ref().map_or(config.export.len(), |c| c.export.len());
     log::info!("export server listening on TCP {} ({rules} shared device rule(s))", config.usbip_port);
     while !stop.load(Ordering::Relaxed) {
@@ -218,12 +212,15 @@ pub fn run(config: Arc<Config>, state: Arc<ExportState>, stop: Arc<AtomicBool>) 
             Err(e) => return Err(e.into()),
         }
     }
-    // End running sessions; their threads give the devices back to Windows.
+    // End running sessions; their threads give the devices back to this computer.
     for (bus, (client, s, _)) in state.active.lock().unwrap().iter() {
         log::info!("stopping: ending session {bus} with {client}");
         let _ = s.shutdown(Shutdown::Both);
     }
-    std::thread::sleep(Duration::from_secs(2));
+    let t = Instant::now();
+    while !state.active.lock().unwrap().is_empty() && t.elapsed() < Duration::from_secs(5) {
+        std::thread::sleep(Duration::from_millis(100));
+    }
     Ok(())
 }
 
@@ -263,8 +260,8 @@ fn handle_connection(stream: TcpStream, peer: IpAddr, config: &Config, state: &E
                 bail!("{busid} is already in use by another client");
             }
             let t0 = Instant::now();
-            let cap = match Captured::capture(&device.platform_id) {
-                Ok(c) => Arc::new(c),
+            let lease = match Lease::capture(&device) {
+                Ok(l) => l,
                 Err(e) => {
                     state.problems.lock().unwrap().insert(problem_key(&device), (format!("{e:#}"), Instant::now(), peer.to_string()));
                     // "busy" tells the client that something on this host holds the device.
@@ -273,31 +270,19 @@ fn handle_connection(stream: TcpStream, peer: IpAddr, config: &Config, state: &E
                 }
             };
             state.problems.lock().unwrap().remove(&problem_key(&device));
-            let (dd, cfg) = descriptors(&cap)?;
             let (mut info, _) = wire_device(&device);
-            info.bcd_device = u16::from_le_bytes([dd[12], dd[13]]);
-            info.device_class = dd[4];
-            info.device_subclass = dd[5];
-            info.device_protocol = dd[6];
-            info.configuration_value = cfg.configuration_value;
-            info.num_configurations = dd[17];
-            info.num_interfaces = cfg.num_interfaces;
-            info.speed = match port_speed(&cap.vbox_instance_id, cap.port) {
-                Some(0) => Speed::Low,
-                Some(2) => Speed::High,
-                Some(3) => Speed::Super,
-                _ => Speed::Full,
-            };
+            lease.complete(&mut info)?;
             // The 10 s timeout only guards the operation phase. On Windows a socket option
             // set before try_clone() stays on each duplicated handle, so clear it on the
             // handle the session reads from, too - otherwise an idle device (no URBs for 10 s)
-            // would end the session.
+            // would end the session. (On Linux the kernel would obey it, too.)
             stream.set_read_timeout(None)?;
             reader.get_ref().set_read_timeout(None)?;
+            lease.hand_over(&stream)?;
             write_import_reply(&mut s, Some(&info))?;
             log::info!("{peer}: attached {} ({busid}, {:?}) after {} ms", device.display_name(), info.speed, t0.elapsed().as_millis());
             state.active.lock().unwrap().insert(busid.clone(), (peer.to_string(), stream.try_clone()?, device.clone()));
-            let result = run_session(cap, cfg, info.speed, stream, reader);
+            let result = lease.serve(info.speed, stream, reader);
             state.active.lock().unwrap().remove(&busid);
             log::info!("{peer}: session for {busid} ended ({})", match &result {
                 Ok(()) => "client detached".to_string(),

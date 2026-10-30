@@ -22,6 +22,11 @@ pub struct UsbDevice {
     pub classes: Vec<crate::classes::DeviceClass>,
 }
 
+/// `true`, for serde defaults.
+pub fn yes() -> bool {
+    true
+}
+
 impl UsbDevice {
     /// Human-readable name: product string, else "VID:PID".
     pub fn display_name(&self) -> String {

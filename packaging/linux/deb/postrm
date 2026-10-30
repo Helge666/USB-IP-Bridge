@@ -8,6 +8,7 @@ case "$1" in
         rm -f /etc/wireplumber/main.lua.d/51-usb-ip-bridge.lua /etc/wireplumber/wireplumber.conf.d/51-usb-ip-bridge.conf
         if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
             ufw delete allow 3244 >/dev/null 2>&1 || true
+            ufw delete allow 3242/tcp >/dev/null 2>&1 || true
         fi
         [ -d /run/systemd/system ] && systemctl daemon-reload || true
         ;;

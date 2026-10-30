@@ -1,5 +1,5 @@
-//! Starts and stops the service's workers: export server (Windows), import workers
-//! (Linux), the local API and the connection to other computers.
+//! Starts and stops the service's workers: export server, import workers (Linux), the
+//! local API and the connection to other computers.
 
 use anyhow::Result;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -25,11 +25,13 @@ pub struct Engine {
     pub peers: crate::peers::Peers,
     profiles: Profiles,
     threads: Vec<JoinHandle<()>>,
-    #[cfg(windows)]
-    export: Arc<usbipb_host::windows::export::ExportState>,
+    #[cfg(any(windows, target_os = "linux"))]
+    export: Arc<usbipb_host::export::ExportState>,
     /// Devices of other computers this computer can use: from config.toml, then the ones
     /// added in the GUI (or by the other computer). Indices stay stable while running.
     imports: Mutex<Vec<ImportSlot>>,
+    /// Shared devices as they were last seen (name, kind), for while they are not plugged in.
+    known: Mutex<Vec<PeerDevice>>,
 }
 
 struct ImportSlot {
@@ -85,6 +87,10 @@ pub fn state_dir() -> std::path::PathBuf {
     } else {
         std::path::PathBuf::from("/var/lib/usb-ip-bridge")
     }
+}
+
+fn known_path() -> std::path::PathBuf {
+    state_dir().join("known-devices.json")
 }
 
 fn wanted_path() -> std::path::PathBuf {
@@ -169,13 +175,7 @@ fn load_wanted() -> Vec<String> {
 }
 
 pub fn hostname() -> String {
-    std::env::var("COMPUTERNAME")
-        .ok()
-        .or_else(|| std::fs::read_to_string("/etc/hostname").ok().map(|s| s.trim().to_string()))
-        // macOS has no /etc/hostname
-        .or_else(|| std::process::Command::new("hostname").output().ok().map(|o| String::from_utf8_lossy(&o.stdout).trim().trim_end_matches(".local").to_string()))
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| "unknown".into())
+    usbipb_host::system::host_name()
 }
 
 impl Engine {
@@ -186,25 +186,25 @@ impl Engine {
         let effective = Arc::new(shares.apply(&config));
         log::info!("{} starting on {} (config {})", usbipb_core::title(), hostname(), path.display());
         let stop = Arc::new(AtomicBool::new(false));
-        #[cfg_attr(not(windows), allow(unused_mut))] // only the export server is joined
+        #[cfg_attr(not(any(windows, target_os = "linux")), allow(unused_mut))] // only the export server is joined
         let mut threads = Vec::new();
 
-        #[cfg(windows)]
-        let export = Arc::new(usbipb_host::windows::export::ExportState::default());
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "linux"))]
+        let export = Arc::new(usbipb_host::export::ExportState::default());
+        #[cfg(any(windows, target_os = "linux"))]
         export.set_config(effective.clone());
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "linux"))]
         export.set_allow_unpaired(!config.require_pairing);
         if !config.require_pairing {
             log::warn!("require_pairing = false: any computer in the network may use the shared devices");
         }
-        #[cfg(windows)]
-        {
+        #[cfg(any(windows, target_os = "linux"))]
+        if usbipb_host::can_export() {
             let (c, s, st) = (config.clone(), export.clone(), stop.clone());
             threads.push(std::thread::spawn(move || {
                 // Keep the export server up even if binding fails for a while (e.g. at boot).
                 while !st.load(Ordering::Relaxed) {
-                    if let Err(e) = usbipb_host::windows::export::run(c.clone(), s.clone(), st.clone()) {
+                    if let Err(e) = usbipb_host::export::run(c.clone(), s.clone(), st.clone()) {
                         log::error!("export server: {e:#}; retrying in 5 s");
                         std::thread::sleep(Duration::from_secs(5));
                     }
@@ -241,9 +241,10 @@ impl Engine {
             peers: Default::default(),
             profiles: Profiles::load(),
             threads,
-            #[cfg(windows)]
+            #[cfg(any(windows, target_os = "linux"))]
             export,
             imports: Mutex::new(imports),
+            known: Mutex::new(std::fs::read_to_string(known_path()).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()),
         });
         crate::api::spawn(engine.clone())?;
         if let Err(e) = crate::peers::spawn(engine.clone()) {
@@ -278,9 +279,9 @@ impl Engine {
 
     /// The computer at `ip` proved to be paired: it may use shared devices (USB/IP).
     pub fn authorize(&self, ip: std::net::IpAddr) {
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "linux"))]
         self.export.authorize(ip);
-        #[cfg(not(windows))]
+        #[cfg(not(any(windows, target_os = "linux")))]
         let _ = ip;
     }
 
@@ -291,8 +292,8 @@ impl Engine {
 
     /// Shares a device of this computer, or stops sharing it; remembered across restarts.
     pub fn set_shared(&self, device: DeviceMatch, share: bool) -> Result<String> {
-        if !cfg!(windows) {
-            anyhow::bail!("sharing devices is not supported on this platform yet");
+        if !usbipb_host::can_export() {
+            anyhow::bail!("this computer cannot share devices (on Linux the kernel module usbip-host is missing)");
         }
         let name = format!("{:04x}:{:04x}", device.vendor_id, device.product_id);
         if share {
@@ -302,7 +303,7 @@ impl Engine {
                 anyhow::bail!("{name} is locked on this computer (unlock it first)");
             }
         }
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "linux"))]
         if !share && self.export.lent().iter().any(|(_, _, d)| device.matches(d)) {
             anyhow::bail!("{name} is in use by another computer – it has to be given back first");
         }
@@ -318,7 +319,7 @@ impl Engine {
         std::fs::write(shares_path(), serde_json::to_string_pretty(&*shares)?)?;
         let effective = Arc::new(shares.apply(&self.config));
         *self.effective.lock().unwrap() = effective.clone();
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "linux"))]
         self.export.set_config(effective);
         log::info!("{name}: {} by the user", if share { "shared" } else { "no longer shared" });
         Ok(format!("{name} {}", if share { "shared" } else { "no longer shared" }))
@@ -330,7 +331,7 @@ impl Engine {
         if !lock && self.config.never_share.iter().any(|m| same_device(m, &device)) {
             anyhow::bail!("{name} is locked in the configuration file ({}) – it can only be unlocked there", config_path().display());
         }
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "linux"))]
         if lock && self.export.lent().iter().any(|(_, _, d)| device.matches(d)) {
             anyhow::bail!("{name} is in use by another computer – take it back first");
         }
@@ -345,7 +346,7 @@ impl Engine {
         std::fs::write(shares_path(), serde_json::to_string_pretty(&*shares)?)?;
         let effective = Arc::new(shares.apply(&self.config));
         *self.effective.lock().unwrap() = effective.clone();
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "linux"))]
         self.export.set_config(effective);
         log::info!("{name}: {} by the user", if lock { "locked" } else { "unlocked" });
         Ok(format!("{name} {}", if lock { "locked" } else { "unlocked" }))
@@ -363,26 +364,90 @@ impl Engine {
             } else {
                 Offer::NotShared
             };
-            PeerDevice { name: p.name.unwrap_or_else(|| d.display_name()), classes: p.classes, warnings: p.warnings, offer, used_by, device: d }
+            PeerDevice { name: p.name.unwrap_or_else(|| d.display_name()), classes: p.classes, warnings: p.warnings, offer, used_by, device: d, present: true }
         };
-        // While a device is lent, Windows lists the capture driver (VirtualBox USB) in its place.
-        let mut out: Vec<PeerDevice> =
-            usbipb_host::list_devices().into_iter().filter(|d| !(d.vendor_id == 0x80ee && d.product_id == 0xcafe)).map(|d| describe(d, None)).collect();
-        for e in self.status_exports() {
+        // While a device is lent, Windows lists the capture driver (VirtualBox USB) in its
+        // place, Linux the device itself (bound to usbip-host): it is added below.
+        let exports = self.status_exports();
+        let lent = |d: &usbipb_core::model::UsbDevice| exports.iter().any(|e| e.client.is_some() && e.device.as_ref().is_some_and(|x| x.bus_id == d.bus_id));
+        let mut out: Vec<PeerDevice> = usbipb_host::list_devices()
+            .into_iter()
+            // devices of other computers used here are theirs
+            .filter(|d| !(d.vendor_id == 0x80ee && d.product_id == 0xcafe) && !lent(d) && d.state != DeviceState::Attached)
+            .map(|d| describe(d, None))
+            .collect();
+        for e in exports {
             if let (Some(d), Some(client)) = (e.device, e.client) {
                 if d.state == DeviceState::InUseRemotely {
                     out.push(describe(d, Some(e.client_name.unwrap_or(client))));
                 }
             }
         }
+        self.remember(&out);
+        // shared devices that are not plugged in, as they were last seen
+        for r in &config.export {
+            if out.iter().any(|d| r.device.matches(&d.device)) {
+                continue;
+            }
+            if let Some(mut k) = self.known_device(&r.device) {
+                k.offer = if config.is_blocked(&k.device) { Offer::Never } else { Offer::Shared };
+                k.present = false;
+                out.push(k);
+            }
+        }
         out.sort_by(|a, b| a.device.bus_id.cmp(&b.device.bus_id));
         out
     }
 
+    /// Remembers how the shared devices look (saved when that changes).
+    fn remember(&self, devices: &[PeerDevice]) {
+        let mut known = self.known.lock().unwrap();
+        let mut changed = false;
+        for d in devices.iter().filter(|d| d.offer == Offer::Shared) {
+            let mut k = d.clone();
+            k.used_by = None;
+            k.device.state = DeviceState::Local;
+            k.device.driver = None;
+            let m = DeviceMatch { vendor_id: k.device.vendor_id, product_id: k.device.product_id, serial: k.device.serial.clone() };
+            match known.iter_mut().find(|x| same_device(&m, &DeviceMatch { vendor_id: x.device.vendor_id, product_id: x.device.product_id, serial: x.device.serial.clone() })) {
+                Some(x) if *x == k => {}
+                Some(x) => {
+                    *x = k;
+                    changed = true;
+                }
+                None => {
+                    known.push(k);
+                    changed = true;
+                }
+            }
+        }
+        if changed {
+            if let Err(e) = serde_json::to_string_pretty(&*known).map_err(anyhow::Error::from).and_then(|s| Ok(std::fs::write(known_path(), s)?)) {
+                log::warn!("cannot save {}: {e:#}", known_path().display());
+            }
+        }
+    }
+
+    /// A shared device as it was last seen.
+    fn known_device(&self, m: &DeviceMatch) -> Option<PeerDevice> {
+        self.known.lock().unwrap().iter().find(|k| m.matches(&k.device)).cloned()
+    }
+
+    /// The shared devices; one that is not plugged in is described as it was last seen.
     fn status_exports(&self) -> Vec<usbipb_core::api::ExportStatus> {
-        #[cfg(windows)]
-        return self.export.status(&self.effective());
-        #[cfg(not(windows))]
+        #[cfg(any(windows, target_os = "linux"))]
+        {
+            let config = self.effective();
+            let mut exports = self.export.status(&config);
+            // `status` lists one entry per share, in order
+            for (e, r) in exports.iter_mut().zip(&config.export) {
+                if e.device.is_none() {
+                    e.device = self.known_device(&r.device).map(|k| k.device);
+                }
+            }
+            exports
+        }
+        #[cfg(not(any(windows, target_os = "linux")))]
         Vec::new()
     }
 
@@ -494,7 +559,7 @@ impl Engine {
         std::fs::write(shares_path(), serde_json::to_string_pretty(&*shares)?)?;
         let effective = Arc::new(shares.apply(&self.config));
         *self.effective.lock().unwrap() = effective.clone();
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "linux"))]
         self.export.set_config(effective);
         log::info!("{:04x}:{:04x}: {ip} allowed (given to it by the user)", device.vendor_id, device.product_id);
         Ok(())
@@ -502,7 +567,7 @@ impl Engine {
 
     /// Asks the computer that uses a device of this computer to give it back.
     pub fn take_back(&self, device: DeviceMatch) -> Result<String> {
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "linux"))]
         {
             let Some((client, _)) = self.export.lent().into_iter().map(|(_, c, d)| (c, d)).find(|(_, d)| device.matches(d)) else {
                 anyhow::bail!("{:04x}:{:04x} is not used by another computer", device.vendor_id, device.product_id);
@@ -511,7 +576,7 @@ impl Engine {
             let mut c = usbipb_core::peer::PeerClient::connect(&address, &self.security.identity)?;
             c.call_ok(&usbipb_core::peer::PeerRequest::Release { device })
         }
-        #[cfg(not(windows))]
+        #[cfg(not(any(windows, target_os = "linux")))]
         {
             let _ = device;
             anyhow::bail!("sharing devices is not supported on this platform yet")

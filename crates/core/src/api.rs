@@ -158,6 +158,10 @@ pub struct ExportStatus {
     pub problem_client_name: Option<String>,
     /// Programs configured as possible blockers for this device.
     pub blocking_processes: Vec<String>,
+    /// The device is plugged in (or lent). If not, `device` is how it looked when it was
+    /// last seen, if known.
+    #[serde(default = "crate::model::yes")]
+    pub present: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

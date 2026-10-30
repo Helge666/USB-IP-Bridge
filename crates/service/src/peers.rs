@@ -213,8 +213,8 @@ pub fn hello(engine: &Engine, paired: bool) -> Hello {
         auth: "pairing".into(),
         paired,
         usbip_port: engine.config.usbip_port,
-        can_export: cfg!(windows),
-        can_import: cfg!(target_os = "linux"),
+        can_export: usbipb_host::can_export(),
+        can_import: usbipb_host::can_import(),
         system: Some(usbipb_host::system::info()),
     }
 }

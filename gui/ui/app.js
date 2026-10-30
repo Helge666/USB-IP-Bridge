@@ -2,8 +2,8 @@
 // selected item (right). Polls the app backend every 2 s.
 const invoke = window.__TAURI__.core.invoke;
 
-let canShare = false; // this computer can share its devices (Windows)
-let canImport = false; // this computer can use devices of others (Linux)
+let canShare = false; // this computer can share its devices
+let canImport = false; // this computer can use devices of others
 let status = null; // service status (null: service not reachable)
 let statusError = null;
 let localDevices = [];
@@ -74,9 +74,10 @@ function buildModel() {
   const local = { key: "host:local", local: true, name: status ? status.host : t("thisComputer"), online: !!status, devices: [] };
   for (const row of localDevices) {
     // While a device is used by another computer, Windows lists the capture driver
-    // (VirtualBox USB, 80ee:cafe) in its place: show the real device.
+    // (VirtualBox USB, 80ee:cafe) in its place, Linux the device bound to usbip-host:
+    // show the real device as lent.
     const vbox = row.vendor_id === 0x80ee && row.product_id === 0xcafe;
-    const lentTo = vbox ? lent.find((e) => e.device.bus_id === row.bus_id) : null;
+    const lentTo = lent.find((e) => e.device.bus_id === row.bus_id) || null;
     if (vbox && !lentTo) continue;
     if (row.state === "attached") continue; // a device of another computer, shown there
     const device = lentTo ? lentTo.device : row;
@@ -95,6 +96,17 @@ function buildModel() {
     };
     if (lentTo) d.warnings = (profileOf(d) || {}).warnings || [];
     local.devices.push(d);
+  }
+  // shared devices that are not plugged in (as they were last seen)
+  for (const e of exports) {
+    if (e.present !== false || !e.device) continue;
+    const device = e.device;
+    local.devices.push({
+      kind: "device", local: true, host: local, device,
+      key: `dev:local:${hex(device.vendor_id)}:${hex(device.product_id)}:${device.serial || device.bus_id}`,
+      name: deviceName(device), classes: device.classes || [], warnings: [], profile: null,
+      state: "absent", lock: null, usedBy: null, problem: null, importers,
+    });
   }
   hosts.push(local);
 
@@ -115,7 +127,7 @@ function buildModel() {
         kind: "device", local: false, host, device: pd.device, imp,
         key: `dev:${host.key}:${hex(pd.device.vendor_id)}:${hex(pd.device.product_id)}:${pd.device.serial || pd.device.bus_id}`,
         name: pd.name, classes: pd.classes, warnings: pd.warnings, offer: pd.offer,
-        state: here ? "here" : pd.used_by ? "used" : pd.offer,
+        state: here ? "here" : pd.present === false ? "absent" : pd.used_by ? "used" : pd.offer,
         usedBy: pd.used_by,
       });
     }
@@ -128,7 +140,7 @@ function buildModel() {
         key: `dev:${host.key}:${hex(device.vendor_id)}:${hex(device.product_id)}:${device.serial || "-"}`,
         name: imp.device_name || `${hex(device.vendor_id)}:${hex(device.product_id)}`,
         classes: imp.classes, warnings: imp.warnings, offer: "shared",
-        state: imp.wanted ? "here" : "shared",
+        state: imp.wanted ? "here" : "absent",
       });
     }
     hosts.push(host);
@@ -158,6 +170,7 @@ function actionsOf(item) {
   }
   const d = item;
   if (d.local) {
+    if (d.state === "absent") return [{ label: t("unshare"), secondary: true, run: () => invoke("set_shared", { ...matchArgs(d.device), share: false }) }];
     if (d.state === "lent") return canShare ? [{ label: t("takeBack"), run: () => invoke("take_back", matchArgs(d.device)) }] : [];
     const setLock = (lock) => () => invoke("set_locked", { ...matchArgs(d.device), lock });
     // locked in config.toml: only there
@@ -211,9 +224,11 @@ function chipOf(d) {
     case "lent": return el("span", { class: "chip busy" }, `→ ${d.usedBy}`);
     case "used": return el("span", { class: "chip busy" }, `→ ${d.usedBy}`);
     case "here":
+      if (d.imp && d.imp.state === "waiting") return el("span", { class: "chip warn" }, t("chipWaiting"));
       if (d.imp && d.imp.state !== "attached") return el("span", { class: "chip warn" }, t("chipConnecting"));
       return el("span", { class: "chip busy" }, t("chipHere"));
     case "blocked": case "never": return el("span", { class: "chip lock", title: t("offerNever") }, "🔒");
+    case "absent": return el("span", { class: "chip" }, t("chipAbsent"));
     default: return null;
   }
 }
@@ -257,7 +272,7 @@ function renderTree() {
     const meta = h.local ? t("thisComputerTag") : !h.online ? t("peerOffline") : h.paired ? "" : t("notPaired");
     const children = open ? devices.map((d) => {
       flat.push(d);
-      const dim = ["not_shared", "never", "blocked"].includes(d.state);
+      const dim = ["not_shared", "never", "blocked", "absent"].includes(d.state);
       return el("li", { role: "treeitem", id: "ti-" + flat.length, "data-key": d.key, "aria-selected": d.key === selectedKey,
         class: `device${d.key === selectedKey ? " selected" : ""}${dim ? " dim" : ""}${isFresh(d.key) ? " fresh" : ""}` },
         el("div", { class: "row" },
@@ -426,6 +441,7 @@ function statusLine(item) {
     if (item.state === "local") { dot = ""; text = t("stateLocal"); }
     if (item.state === "shared") { dot = "ok"; text = t("stateShared"); }
     if (item.state === "lent") { dot = "busy"; text = t("stateLent", { host: item.usedBy }); }
+    if (item.state === "absent") { dot = ""; text = t("stateAbsentLocal"); }
     if (item.state === "blocked") { dot = ""; text = t({ auto: "stateLockedAuto", user: "stateLockedUser" }[item.lock] || "stateBlocked"); }
   } else {
     const host = item.host.name;
@@ -442,6 +458,7 @@ function statusLine(item) {
     } else if (item.state === "used") { dot = "busy"; text = t("statePeerUsed", { user: item.usedBy }); }
     else if (item.state === "shared") { dot = item.host.online ? "ok" : ""; text = item.host.online ? t("statePeerShared", { host }) : t("peerOffline"); }
     else if (item.state === "never") { text = t("statePeerNever", { host }); }
+    else if (item.state === "absent") { text = t("stateAbsent", { host }); }
     else { text = t("statePeerNotShared", { host }); }
     if (imp && !imp.wanted && imp.state === "disabled" && imp.last_error) { dot = "warn"; text = `${t("disabled", { error: imp.last_error })}`; }
   }

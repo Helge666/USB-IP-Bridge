@@ -4,6 +4,28 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- `usbipb panel`: an interactive panel for the terminal with what the app offers –
+  computers and their devices, details, share, give to, take back, use here, give back,
+  lock, pair, add computers. Plain ASCII only, so it works in any terminal and over SSH;
+  English and German (`--lang de|en`, else the system language).
+- Linux can share its devices (kernel driver `usbip-host`): a shared device stays usable
+  locally until another computer takes it and gets its normal driver back afterwards;
+  mounted file systems are unmounted first. The Linux package opens TCP 3242 in ufw.
+  (Not tested between two Linux computers yet.)
+- Shared devices keep their name while they are not plugged in: the sharing computer
+  remembers them and lists them as "not there" (also to other computers).
+
+### Changed
+- A device that is wanted here but not offered right now shows "waiting" instead of
+  "connecting…".
+
+### Fixed
+- A computer no longer lists devices it only uses from another computer as its own.
+- The device details said "Windows device ID" on Linux, too.
+
 ## [0.1.1] – 2026-10-24
 
 First public release.

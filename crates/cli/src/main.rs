@@ -1,5 +1,7 @@
 //! usbipb – command line tool.
 //!
+//!   usbipb panel [--lang de|en]
+//!                    interactive panel for the terminal (plain ASCII)
 //!   usbipb list      USB devices on this computer
 //!   usbipb status    what the service shares and attaches
 //!   usbipb attach/detach [N]
@@ -12,6 +14,8 @@
 //!                    attach a device, wait until it is usable, run the program, and
 //!                    give the device back afterwards (if it was not here before)
 
+mod panel;
+
 use anyhow::Result;
 use usbipb_core::api::{self, ImportState, PairingState, Request, Response};
 use usbipb_core::config::{config_path, Config};
@@ -21,6 +25,7 @@ use std::time::{Duration, Instant};
 
 fn main() -> Result<()> {
     match std::env::args().nth(1).as_deref() {
+        Some("panel") => panel::run(),
         Some("list") => list(),
         Some("status") => status(),
         Some("attach") => wish(true),
@@ -37,7 +42,7 @@ fn main() -> Result<()> {
             Ok(())
         }
         _ => {
-            eprintln!("{}\nusage: usbipb list | status | attach [N] | detach [N] | run [--device D] [--wait S] -- PROGRAM [ARGS] | share/unshare VID:PID[:SERIAL] | pair COMPUTER | pair-answer ID CODE|no | unpair COMPUTER | --version", usbipb_core::title());
+            eprintln!("{}\nusage: usbipb panel [--lang de|en] | list | status | attach [N] | detach [N] | run [--device D] [--wait S] -- PROGRAM [ARGS] | share/unshare VID:PID[:SERIAL] | pair COMPUTER | pair-answer ID CODE|no | unpair COMPUTER | --version", usbipb_core::title());
             std::process::exit(2);
         }
     }

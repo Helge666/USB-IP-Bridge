@@ -82,6 +82,9 @@ usbipb run --device 1397:00d4 -- meine-daw
 
 ## Kommandozeile
 
+`usbipb panel` öffnet ein Bedienpanel im Terminal (nur ASCII, auch über SSH) mit denselben
+Funktionen wie die App.
+
 `usbipb list | status | attach [N] | detach [N] | share/unshare VID:PID | pair COMPUTER |
 pair-answer ID CODE | unpair COMPUTER | run [--device D] -- PROGRAMM`
 

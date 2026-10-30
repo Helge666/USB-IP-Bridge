@@ -111,6 +111,10 @@ pub struct PeerDevice {
     /// Host name of the computer currently using it, if lent.
     #[serde(default)]
     pub used_by: Option<String>,
+    /// Plugged in right now. A shared device that is not is still listed, as it was when
+    /// it was last seen (so it keeps its name).
+    #[serde(default = "crate::model::yes")]
+    pub present: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -80,6 +80,9 @@ usbipb run --device 1397:00d4 -- my-daw
 
 ## Command line
 
+`usbipb panel` opens an interactive panel in the terminal (plain ASCII, also over SSH) with
+the same functions as the app.
+
 `usbipb list | status | attach [N] | detach [N] | share/unshare VID:PID | pair COMPUTER |
 pair-answer ID CODE | unpair COMPUTER | run [--device D] -- PROGRAM`
 

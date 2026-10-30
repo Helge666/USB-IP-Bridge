@@ -39,7 +39,7 @@ fn config() -> Config {
 
 #[tauri::command]
 fn app_info() -> serde_json::Value {
-    serde_json::json!({ "title": usbipb_core::title(), "version": usbipb_core::VERSION, "can_share": cfg!(windows), "can_import": cfg!(target_os = "linux") })
+    serde_json::json!({ "title": usbipb_core::title(), "version": usbipb_core::VERSION, "can_share": usbipb_host::can_export(), "can_import": usbipb_host::can_import() })
 }
 
 #[tauri::command]

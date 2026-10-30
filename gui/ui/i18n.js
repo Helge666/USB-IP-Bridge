@@ -32,7 +32,9 @@ const MESSAGES = {
     peerOnline: "online",
     peerOffline: "not reachable",
 
-    chipShared: "shared", chipHere: "here", chipConnecting: "connecting…",
+    chipShared: "shared", chipHere: "here", chipConnecting: "connecting…", chipWaiting: "waiting", chipAbsent: "not there",
+    stateAbsent: "{host} does not list it right now (not plugged in, or {host} is not reachable).",
+    stateAbsentLocal: "Shared, but not plugged in right now.",
     stateLocal: "Only used on this computer – not shared.",
     stateShared: "Shared – used here until another computer takes it.",
     stateLent: "In use by {host}.",
@@ -72,7 +74,7 @@ const MESSAGES = {
 
     sectionDetails: "Details", sectionWarnings: "Good to know", sectionConnection: "Connection", sectionProfile: "Device profile",
     factComputer: "Computer", factKind: "Kind", factIds: "Vendor : product ID", factSerial: "Serial number",
-    factMaker: "Manufacturer", factProduct: "Product name", factPort: "Port", factDriver: "Driver", factPlatformId: "Windows device ID",
+    factMaker: "Manufacturer", factProduct: "Product name", factPort: "Port", factDriver: "Driver", factPlatformId: "System device ID",
     connPort: "Port here", connSince: "Connected", connCount: "Attached", connError: "Last problem", times: "{n}×",
     secsAgo: "{s} s ago", minsAgo: "{m} min ago",
     hostAddress: "Address", hostVersion: "Version", hostCan: "Can", hostHow: "Known through", hostSeen: "Last answer",
@@ -145,7 +147,9 @@ const MESSAGES = {
     peerOnline: "erreichbar",
     peerOffline: "nicht erreichbar",
 
-    chipShared: "freigegeben", chipHere: "hier", chipConnecting: "verbinde…",
+    chipShared: "freigegeben", chipHere: "hier", chipConnecting: "verbinde…", chipWaiting: "wartet", chipAbsent: "nicht da",
+    stateAbsent: "{host} meldet es gerade nicht (nicht eingesteckt, oder {host} ist nicht erreichbar).",
+    stateAbsentLocal: "Freigegeben, aber gerade nicht eingesteckt.",
     stateLocal: "Nur auf diesem Computer – nicht freigegeben.",
     stateShared: "Freigegeben – wird hier benutzt, bis ein anderer Computer es holt.",
     stateLent: "Wird gerade von {host} benutzt.",
@@ -185,7 +189,7 @@ const MESSAGES = {
 
     sectionDetails: "Details", sectionWarnings: "Gut zu wissen", sectionConnection: "Verbindung", sectionProfile: "Geräteprofil",
     factComputer: "Computer", factKind: "Art", factIds: "Hersteller- : Produkt-ID", factSerial: "Seriennummer",
-    factMaker: "Hersteller", factProduct: "Produktbezeichnung", factPort: "Anschluss", factDriver: "Treiber", factPlatformId: "Windows-Geräte-ID",
+    factMaker: "Hersteller", factProduct: "Produktbezeichnung", factPort: "Anschluss", factDriver: "Treiber", factPlatformId: "Geräte-ID im System",
     connPort: "Anschluss hier", connSince: "Verbunden", connCount: "Eingebunden", connError: "Letztes Problem", times: "{n}×",
     secsAgo: "vor {s} s", minsAgo: "vor {m} min",
     hostAddress: "Adresse", hostVersion: "Version", hostCan: "Kann", hostHow: "Bekannt durch", hostSeen: "Letzte Antwort",
