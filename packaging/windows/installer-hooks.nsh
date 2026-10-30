@@ -3,6 +3,9 @@
 ; whose signed VBoxUSB drivers USB-IP-Bridge uses to share the devices of this computer.
 
 !macro NSIS_HOOK_PREINSTALL
+  ; Close the app first (also in other user sessions): the installer's own check comes after
+  ; this hook and would stop the update with the service already stopped.
+  nsExec::ExecToLog 'taskkill.exe /f /im usbipb-gui.exe'
   ; An update replaces the service program: stop the service first. Stop-Service waits until
   ; it has stopped (older versions of the program have no "stop" command of their own).
   nsExec::ExecToLog 'powershell.exe -NoProfile -NonInteractive -Command "Stop-Service USB-IP-Bridge -Force -ErrorAction SilentlyContinue"'

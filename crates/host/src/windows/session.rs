@@ -451,6 +451,7 @@ pub fn descriptors(cap: &Captured) -> Result<([u8; 18], ConfigInfo)> {
 }
 
 pub fn run_session(cap: Arc<Captured>, config: ConfigInfo, speed: Speed, stream: TcpStream, mut reader: BufReader<TcpStream>) -> Result<()> {
+    let ctl = stream.try_clone()?;
     let sh = Arc::new(Shared {
         dev: cap.file,
         writer: Mutex::new(stream),
@@ -485,6 +486,22 @@ pub fn run_session(cap: Arc<Captured>, config: ConfigInfo, speed: Speed, stream:
                     );
                 }
                 last = now;
+            }
+        });
+    }
+
+    // An unplugged device does not end the session by itself (its requests just fail):
+    // end it, so the client lets go and attaches again once the device is back.
+    {
+        let (cap, alive) = (cap.clone(), alive.clone());
+        std::thread::spawn(move || {
+            while alive.load(Ordering::Relaxed) {
+                std::thread::sleep(Duration::from_millis(500));
+                if let (true, Err(e)) = (alive.load(Ordering::Relaxed), cap.present()) {
+                    log::info!("device unplugged ({e}), ending the session");
+                    let _ = ctl.shutdown(std::net::Shutdown::Both);
+                    break;
+                }
             }
         });
     }

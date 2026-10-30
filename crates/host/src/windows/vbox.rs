@@ -228,12 +228,20 @@ fn remove_subtree(dn: u32) -> Result<()> {
     Ok(())
 }
 
+/// Device path of the hub a device is plugged into.
+fn hub_path_of(instance_id: &str) -> Result<String> {
+    let parent = devnode_string(instance_id, &DEVPKEY_Device_Parent).ok_or_else(|| anyhow!("no parent hub"))?;
+    interface_paths(&GUID_DEVINTERFACE_USB_HUB, Some(&parent)).into_iter().next().ok_or_else(|| anyhow!("hub interface not found"))
+}
+
 /// Power-cycles the hub port (unplug/replug) and marks the devnode ready again.
 fn cycle_port(instance_id: &str, port: u16) -> Result<()> {
     std::thread::sleep(Duration::from_millis(100));
-    let parent = devnode_string(instance_id, &DEVPKEY_Device_Parent).ok_or_else(|| anyhow!("no parent hub"))?;
-    let hub_path = interface_paths(&GUID_DEVINTERFACE_USB_HUB, Some(&parent)).into_iter().next().ok_or_else(|| anyhow!("hub interface not found"))?;
-    let hub = open(&hub_path, false)?;
+    cycle_hub_port(&hub_path_of(instance_id)?, port, instance_id)
+}
+
+fn cycle_hub_port(hub_path: &str, port: u16, instance_id: &str) -> Result<()> {
+    let hub = open(hub_path, false)?;
     let mut params = [0u8; 8];
     params[0..4].copy_from_slice(&(port as u32).to_le_bytes());
     let mut out = params;
@@ -308,6 +316,8 @@ pub struct Captured {
     pub pid: u16,
     pub hub: u16,
     pub port: u16,
+    /// The hub, found while the device was there (after an unplug its devnode is gone).
+    hub_path: Option<String>,
     mon: Handle,
     filter_id: u64,
 }
@@ -330,6 +340,7 @@ impl Captured {
             bail!("unsupported VBoxUSBMon version {major}");
         }
 
+        let hub_path = hub_path_of(instance_id).ok();
         let dn = devnode(instance_id)?;
         remove_subtree(dn)?;
 
@@ -385,6 +396,7 @@ impl Captured {
             pid,
             hub,
             port,
+            hub_path,
             mon: Handle(mon),
             filter_id,
         };
@@ -400,6 +412,16 @@ impl Captured {
         let input = getdev;
         ioctl_wait(file, SUPUSB_IOCTL_GET_DEVICE, &input, &mut getdev).context("GET_DEVICE (high-speed flag)")?;
         Ok(cap)
+    }
+
+    /// Is the captured device still plugged in? After unplugging, VBoxUSB no longer
+    /// answers on this handle – also when the device is back already (that is a new one).
+    pub fn present(&self) -> std::result::Result<(), String> {
+        let mut v = [0u8; 8];
+        if let Err(e) = ioctl_wait(self.file.0, SUPUSB_IOCTL_GET_VERSION, &[], &mut v) {
+            return Err(format!("VBoxUSB: {e:#}"));
+        }
+        devnode(&self.vbox_instance_id).map(|_| ()).map_err(|e| format!("{e:#}"))
     }
 
     pub fn set_config(&self, value: u8) -> Result<()> {
@@ -458,7 +480,12 @@ impl Drop for Captured {
             log::warn!("release: REMOVE_FILTER failed: {e:#}");
         }
         let id = if self.vbox_instance_id.is_empty() { &self.original_instance_id } else { &self.vbox_instance_id };
-        if let Err(e) = cycle_port(id, self.port) {
+        let cycled = cycle_port(id, self.port).or_else(|e| match &self.hub_path {
+            // e.g. the device was unplugged and plugged in again meanwhile
+            Some(hub) => cycle_hub_port(hub, self.port, id).map_err(|e2| anyhow!("{e:#}; with the hub found at capture: {e2:#}")),
+            None => Err(e),
+        });
+        if let Err(e) = cycled {
             log::warn!("release: port cycle failed: {e:#}");
         }
         unsafe {

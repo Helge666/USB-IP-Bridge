@@ -3854,6 +3854,7 @@ dependencies = [
  "usbip-protocol",
  "usbipb-core",
  "windows",
+ "windows-core",
 ]
 
 [[package]]

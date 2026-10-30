@@ -1,4 +1,4 @@
-//! Starts and stops the service's workers: export server, import workers (Linux), the
+//! Starts and stops the service's workers: export server, import workers, the
 //! local API and the connection to other computers.
 
 use anyhow::Result;
@@ -61,12 +61,12 @@ fn new_slot(rule: ImportRule, saved_wanted: &[String], stop: &Arc<AtomicBool>, a
         classes: Vec::new(),
         warnings: Vec::new(),
     }));
-    #[cfg(target_os = "linux")]
+    #[cfg(any(windows, target_os = "linux"))]
     {
         let (r, st, w, s) = (rule.clone(), stop.clone(), want.clone(), status.clone());
-        std::thread::spawn(move || usbipb_host::linux::import::run(r, s, w, st));
+        std::thread::spawn(move || usbipb_host::import::run(r, s, w, st));
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(any(windows, target_os = "linux")))]
     {
         let _ = stop;
         let mut s = status.lock().unwrap();
@@ -439,10 +439,25 @@ impl Engine {
         {
             let config = self.effective();
             let mut exports = self.export.status(&config);
+            // A paired computer's own name beats reverse DNS (routers name hosts oddly).
+            let peers = self.peers.list();
+            let peer_name = |ip: &Option<String>| {
+                let ip = ip.as_deref()?;
+                peers.iter().find_map(|p| {
+                    let h = p.hello.as_ref()?;
+                    (p.address.rsplit_once(':').map(|(a, _)| a.trim_matches(['[', ']'])) == Some(ip)).then(|| h.host_name.clone())
+                })
+            };
             // `status` lists one entry per share, in order
             for (e, r) in exports.iter_mut().zip(&config.export) {
                 if e.device.is_none() {
                     e.device = self.known_device(&r.device).map(|k| k.device);
+                }
+                if let Some(n) = peer_name(&e.client) {
+                    e.client_name = Some(n);
+                }
+                if let Some(n) = peer_name(&e.problem_client) {
+                    e.problem_client_name = Some(n);
                 }
             }
             exports
@@ -496,8 +511,11 @@ impl Engine {
             Some(i) => i,
             None if !attach => anyhow::bail!("{:04x}:{:04x} from {host} is not used here", device.vendor_id, device.product_id),
             None => {
-                if !cfg!(target_os = "linux") {
-                    anyhow::bail!("using devices of other computers is not supported on this platform yet");
+                if !usbipb_host::can_import() {
+                    anyhow::bail!(
+                        "this computer cannot use devices of other computers{}",
+                        if cfg!(windows) { " (usbip-win2 is not installed)" } else { "" }
+                    );
                 }
                 let rule = ImportRule { host: host.to_string(), port, device, mode: ConnectMode::Manual, auto_reconnect: true };
                 log::info!("{}: added", rule_name(&rule));

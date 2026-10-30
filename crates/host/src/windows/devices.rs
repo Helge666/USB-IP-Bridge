@@ -18,11 +18,15 @@ fn wide_to_string(w: &[u16]) -> String {
 
 /// Reads a string device property, e.g. `DEVPKEY_Device_DriverInfPath`.
 pub fn devnode_string(instance_id: &str, key: &DEVPROPKEY) -> Option<String> {
+    let mut devinst = 0u32;
+    if unsafe { CM_Locate_DevNodeW(&mut devinst, &HSTRING::from(instance_id), CM_LOCATE_DEVNODE_NORMAL) } != CR_SUCCESS {
+        return None;
+    }
+    devinst_string(devinst, key)
+}
+
+fn devinst_string(devinst: u32, key: &DEVPROPKEY) -> Option<String> {
     unsafe {
-        let mut devinst = 0u32;
-        if CM_Locate_DevNodeW(&mut devinst, &HSTRING::from(instance_id), CM_LOCATE_DEVNODE_NORMAL) != CR_SUCCESS {
-            return None;
-        }
         let mut ty = DEVPROPTYPE::default();
         let mut buf = vec![0u8; 1024];
         let mut size = buf.len() as u32;
@@ -75,6 +79,22 @@ fn classes_of(instance_id: &str, port: u16) -> Vec<DeviceClass> {
     classes
 }
 
+/// Is the device attached through usbip-win2, i.e. a device of another computer (its
+/// host controller is the usbip2_ude driver)?
+fn imported(mut devinst: u32) -> bool {
+    for _ in 0..8 {
+        let mut parent = 0u32;
+        if unsafe { CM_Get_Parent(&mut parent, devinst, 0) } != CR_SUCCESS {
+            return false;
+        }
+        if devinst_string(parent, &DEVPKEY_Device_Service).is_some_and(|s| s.eq_ignore_ascii_case("usbip2_ude")) {
+            return true;
+        }
+        devinst = parent;
+    }
+    false
+}
+
 fn hex_after(id: &str, key: &str) -> Option<u16> {
     let i = id.find(key)? + key.len();
     u16::from_str_radix(id.get(i..i + 4)?, 16).ok()
@@ -122,7 +142,7 @@ pub fn list() -> Vec<UsbDevice> {
                 classes: classes_of(&id, port),
                 platform_id: id,
                 driver,
-                state: DeviceState::Local,
+                state: if imported(did.DevInst) { DeviceState::Attached } else { DeviceState::Local },
             });
         }
         let _ = SetupDiDestroyDeviceInfoList(set);

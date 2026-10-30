@@ -1,15 +1,19 @@
-//! Platform layer of USB-IP-Bridge: device enumeration, exporting (Windows, Linux) and
-//! importing (Linux) USB devices over USB/IP.
+//! Platform layer of USB-IP-Bridge: device enumeration, exporting and importing USB
+//! devices over USB/IP (Windows, Linux).
 
 pub mod descriptors;
 #[cfg(any(windows, target_os = "linux"))]
 pub mod export;
+#[cfg(any(windows, target_os = "linux"))]
+pub mod import;
 pub mod net;
 pub mod system;
 
 #[cfg(windows)]
 pub mod windows {
+    pub mod audio;
     pub mod devices;
+    pub mod import;
     pub mod lease;
     pub mod session;
     pub mod vbox;
@@ -47,7 +51,15 @@ pub fn can_export() -> bool {
     })
 }
 
-/// Can this computer use devices of others?
+/// Can this computer use devices of others? (Windows: is usbip-win2 installed – it can
+/// be installed while the service runs.)
 pub fn can_import() -> bool {
-    cfg!(target_os = "linux")
+    #[cfg(windows)]
+    {
+        windows::import::available()
+    }
+    #[cfg(not(windows))]
+    {
+        cfg!(target_os = "linux")
+    }
 }

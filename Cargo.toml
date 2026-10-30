@@ -43,4 +43,6 @@ features = [
     "Win32_System_SystemInformation",
     "Win32_System_Console",
     "Win32_Globalization",
+    "Win32_Media_Audio",
+    "Win32_System_Com",
 ]
