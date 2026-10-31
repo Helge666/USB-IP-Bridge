@@ -135,6 +135,8 @@ pub fn run(rule: ImportRule, status: Arc<Mutex<ImportStatus>>, wanted: Arc<Atomi
     let mut last_refresh: Option<Instant> = None;
     let mut changed = Instant::now();
     let mut backoff = Duration::from_secs(1);
+    // logged once while it stays the same (a device that is not plugged in waits for hours)
+    let mut last_failure: Option<String> = None;
     // (port, remote bus id) while attached
     let mut port = backend::adopt(&rule);
     if let Some((p, busid)) = &port {
@@ -169,6 +171,7 @@ pub fn run(rule: ImportRule, status: Arc<Mutex<ImportStatus>>, wanted: Arc<Atomi
             if status.lock().unwrap().state != ImportState::Disabled {
                 set(&status, ImportState::Idle, None, &mut changed);
             }
+            last_failure = None;
             if last_refresh.is_none_or(|t| t.elapsed() > Duration::from_secs(30)) {
                 refresh_names(&rule, &profiles, &status, false);
                 last_refresh = Some(Instant::now());
@@ -189,11 +192,16 @@ pub fn run(rule: ImportRule, status: Arc<Mutex<ImportStatus>>, wanted: Arc<Atomi
                         drop(s);
                         port = Some((p, busid.clone()));
                         backoff = Duration::from_secs(1);
+                        last_failure = None;
                         (p, busid)
                     }
                     Err(e) => {
-                        log::warn!("{name}: {e:#}");
-                        set(&status, ImportState::Waiting, Some(format!("{e:#}")), &mut changed);
+                        let e = format!("{e:#}");
+                        if last_failure.as_deref() != Some(e.as_str()) {
+                            log::warn!("{name}: {e}");
+                            last_failure = Some(e.clone());
+                        }
+                        set(&status, ImportState::Waiting, Some(e), &mut changed);
                         sleep_unless(&stop, backoff);
                         backoff = (backoff * 2).min(Duration::from_secs(10));
                         continue;

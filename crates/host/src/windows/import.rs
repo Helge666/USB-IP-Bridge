@@ -163,11 +163,55 @@ pub fn before_release(rule: &ImportRule) -> Result<(), String> {
         }
         let end = name.iter().position(|&c| c == 0).unwrap_or(name.len());
         let who = String::from_utf16_lossy(&name[..end]);
-        Err(if who.is_empty() {
+        let drives = drive_letters(&who);
+        Err(if !drives.is_empty() {
+            format!("Windows cannot eject the device yet – {} is still in use (close the files and programs on it)", drives.join(", "))
+        } else if who.is_empty() {
             "Windows cannot eject the device yet – a program still uses it".into()
         } else {
             format!("Windows cannot eject the device yet – in use ({who})")
         })
+    }
+}
+
+/// Drive letters ("F:") of a volume, from its device instance id (`STORAGE\Volume\…`).
+fn drive_letters(instance_id: &str) -> Vec<String> {
+    use windows::core::{GUID, HSTRING, PCWSTR};
+    use windows::Win32::Devices::DeviceAndDriverInstallation::*;
+    use windows::Win32::Storage::FileSystem::{GetVolumeNameForVolumeMountPointW, GetVolumePathNamesForVolumeNameW};
+    // GUID_DEVINTERFACE_VOLUME
+    const VOLUME: GUID = GUID::from_u128(0x53f5630d_b6bf_11d0_94f2_00a0c91efb8b);
+    if instance_id.is_empty() {
+        return Vec::new();
+    }
+    unsafe {
+        let id = HSTRING::from(instance_id);
+        let mut len = 0u32;
+        if CM_Get_Device_Interface_List_SizeW(&mut len, &VOLUME, &id, CM_GET_DEVICE_INTERFACE_LIST_PRESENT) != CR_SUCCESS || len < 2 {
+            return Vec::new();
+        }
+        let mut list = vec![0u16; len as usize];
+        if CM_Get_Device_Interface_ListW(&VOLUME, &id, &mut list, CM_GET_DEVICE_INTERFACE_LIST_PRESENT) != CR_SUCCESS {
+            return Vec::new();
+        }
+        // first interface path, as a mount point (trailing backslash)
+        let end = list.iter().position(|&c| c == 0).unwrap_or(list.len());
+        let mut path = list[..end].to_vec();
+        path.extend("\\\0".encode_utf16());
+        let mut volume = [0u16; 64];
+        if GetVolumeNameForVolumeMountPointW(PCWSTR(path.as_ptr()), &mut volume).is_err() {
+            return Vec::new();
+        }
+        let mut names = [0u16; 512];
+        let mut needed = 0u32;
+        if GetVolumePathNamesForVolumeNameW(PCWSTR(volume.as_ptr()), Some(&mut names), &mut needed).is_err() {
+            return Vec::new();
+        }
+        names
+            .split(|&c| c == 0)
+            .filter(|s| !s.is_empty())
+            .map(|s| String::from_utf16_lossy(s).trim_end_matches('\\').to_string())
+            .collect()
     }
 }
 

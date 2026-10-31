@@ -3,9 +3,9 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
-use tauri::{Manager, State};
+use tauri::{Manager, PhysicalPosition, PhysicalSize, State, WebviewWindow, Window, WindowEvent};
 use usbipb_core::api::{self, Request, Response, Status};
 use usbipb_core::config::{config_path, Config};
 use usbipb_core::classes::DeviceClass;
@@ -253,14 +253,86 @@ fn closed_programs(closed: State<Closed>) -> Vec<String> {
     closed.0.lock().unwrap().clone()
 }
 
+/// Where the window was (physical pixels; size and position while not maximized),
+/// restored at the next start.
+#[derive(Serialize, Deserialize, Clone, Copy)]
+struct Placement {
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+    maximized: bool,
+}
+
+/// The window's last normal placement, saved when it closes.
+#[derive(Default)]
+struct LastPlacement(Mutex<Option<Placement>>);
+
+fn placement_path(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
+    app.path().app_config_dir().ok().map(|d| d.join("window.json"))
+}
+
+/// Puts the window where it was, if that place is still on a screen.
+fn restore_placement(w: &WebviewWindow) -> Option<Placement> {
+    let text = std::fs::read_to_string(placement_path(w.app_handle())?).ok()?;
+    let p: Placement = serde_json::from_str(&text).ok()?;
+    // the title bar must be reachable on one of the screens (one may be unplugged)
+    let on_screen = w.available_monitors().unwrap_or_default().iter().any(|m| {
+        let (mp, ms) = (m.position(), m.size());
+        p.x + 100 < mp.x + ms.width as i32 && p.x + p.width as i32 > mp.x + 100 && p.y >= mp.y - 10 && p.y + 40 < mp.y + ms.height as i32
+    });
+    if !on_screen {
+        return None;
+    }
+    let _ = w.set_size(PhysicalSize::new(p.width, p.height));
+    let _ = w.set_position(PhysicalPosition::new(p.x, p.y));
+    if p.maximized {
+        let _ = w.maximize();
+    }
+    Some(p)
+}
+
+/// Remembers the normal placement (not while maximized or minimized).
+fn remember_placement(w: &Window) {
+    if w.is_maximized().unwrap_or(true) || w.is_minimized().unwrap_or(true) {
+        return;
+    }
+    if let (Ok(pos), Ok(size)) = (w.outer_position(), w.inner_size()) {
+        *w.state::<LastPlacement>().0.lock().unwrap() = Some(Placement { x: pos.x, y: pos.y, width: size.width, height: size.height, maximized: false });
+    }
+}
+
+fn save_placement(w: &Window) {
+    remember_placement(w);
+    let Some(mut p) = *w.state::<LastPlacement>().0.lock().unwrap() else { return };
+    p.maximized = w.is_maximized().unwrap_or(false);
+    if let (Some(path), Ok(text)) = (placement_path(w.app_handle()), serde_json::to_string(&p)) {
+        if let Some(dir) = path.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        let _ = std::fs::write(path, text);
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(Closed::default())
+        .manage(LastPlacement::default())
         .setup(|app| {
             if let Some(w) = app.get_webview_window("main") {
                 let _ = w.set_title(&usbipb_core::title());
+                // the window starts hidden, so it does not jump to its place
+                if let Some(p) = restore_placement(&w) {
+                    *app.state::<LastPlacement>().0.lock().unwrap() = Some(Placement { maximized: false, ..p });
+                }
+                let _ = w.show();
             }
             Ok(())
+        })
+        .on_window_event(|window, event| match event {
+            WindowEvent::Moved(_) | WindowEvent::Resized(_) => remember_placement(window),
+            WindowEvent::CloseRequested { .. } => save_placement(window),
+            _ => {}
         })
         .invoke_handler(tauri::generate_handler![
             app_info,

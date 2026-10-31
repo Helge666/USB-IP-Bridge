@@ -14,13 +14,15 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Linux can share its devices (kernel driver `usbip-host`): a shared device stays usable
   locally until another computer takes it and gets its normal driver back afterwards;
   mounted file systems are unmounted first. The Linux package opens TCP 3242 in ufw.
-  (Not tested between two Linux computers yet.)
+- The app opens where its window was last time (position, size, maximized); on a screen
+  that is no longer there it opens at the usual place.
 - Shared devices keep their name while they are not plugged in: the sharing computer
   remembers them and lists them as "not there" (also to other computers).
 - Windows can use devices of other computers, with the usbip-win2 driver installed
   (https://github.com/vadimgrn/usbip-win2): use here, give back, give to, take back;
   the service keeps a device attached across its own restarts. Storage devices are
-  ejected the safe way before they are given back. An audio device of another computer
+  ejected the safe way before they are given back; while a file on one is open, the
+  device stays and the message names the drive. An audio device of another computer
   does not become the default playback or recording device (Windows would make it one).
 
 ### Changed
@@ -37,7 +39,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Windows: a lent device that is unplugged ends the session, so the other computer
   waits and takes the device again once it is back (before, it kept a dead device).
 - "In use by" showed the router's name for a computer (e.g. a hex number) instead of the
-  name of the paired computer.
+  name of the paired computer; `usbipb status` even showed its address. It also says now
+  when a shared device is not plugged in.
+- A device that waits for its computer no longer writes the same warning to the log every
+  few seconds.
 
 ## [0.1.1] – 2026-10-24
 

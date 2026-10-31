@@ -114,12 +114,16 @@ fn status() -> Result<()> {
             }
             for e in &s.exports {
                 let name = e.device.as_ref().map(|d| format!("{} ({})", d.display_name(), d.bus_id)).unwrap_or_else(|| e.rule.clone());
-                let who = e.client.as_deref().map(|c| format!("in use by {c}")).unwrap_or_else(|| "shared, waiting for a client".into());
+                let who = match e.client_name.as_ref().or(e.client.as_ref()) {
+                    Some(c) => format!("in use by {c}"),
+                    None if !e.present => "shared, not plugged in".into(),
+                    None => "shared, waiting for a client".into(),
+                };
                 println!("  share  {name}: {who}{}", e.note.as_deref().map(|n| format!(" [{n}]")).unwrap_or_default());
                 if let Some(p) = &e.problem {
                     println!(
                         "         ! {} wanted it {} s ago, but: {p}",
-                        e.problem_client.as_deref().unwrap_or("a client"),
+                        e.problem_client_name.as_ref().or(e.problem_client.as_ref()).map_or("a client", |c| c.as_str()),
                         e.problem_age_secs.unwrap_or(0)
                     );
                     if !e.blocking_processes.is_empty() {
@@ -158,7 +162,11 @@ fn status() -> Result<()> {
                 };
                 println!("  computer {} ({}){version}: {state}{paired}", p.name(), p.address);
                 for d in p.devices.iter().filter(|d| d.offer == usbipb_core::peer::Offer::Shared) {
-                    let used = d.used_by.as_deref().map(|u| format!(" – in use by {u}")).unwrap_or_default();
+                    let used = match &d.used_by {
+                        Some(u) => format!(" – in use by {u}"),
+                        None if !d.present => " – not plugged in".into(),
+                        None => String::new(),
+                    };
                     println!("     shares {} ({}){used}", d.name, d.classes.iter().map(|c| c.name()).collect::<Vec<_>>().join("+"));
                 }
             }
