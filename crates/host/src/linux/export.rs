@@ -96,10 +96,73 @@ pub struct Lease {
     dir: PathBuf,
 }
 
+/// Device files of the device that carry its data (sound, MIDI, video, raw HID, usbfs,
+/// the disk itself), from sysfs. Not the sound card's control file and not input events:
+/// the desktop keeps those open all the time and lets go by itself.
+fn data_nodes(dir: &Path) -> Vec<String> {
+    let mut nodes = Vec::new();
+    let mut todo = vec![fs::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf())];
+    while let Some(d) = todo.pop() {
+        let Ok(entries) = fs::read_dir(&d) else { continue };
+        for e in entries.flatten() {
+            // real subdirectories only (sysfs links lead all over the tree)
+            if e.file_type().is_ok_and(|t| t.is_dir()) {
+                todo.push(e.path());
+            }
+        }
+        let Some(name) = fs::read_to_string(d.join("uevent")).ok().and_then(|u| u.lines().find_map(|l| l.strip_prefix("DEVNAME=").map(str::to_string))) else {
+            continue;
+        };
+        let base = name.rsplit('/').next().unwrap_or(&name);
+        if ["control", "event", "mouse", "js"].iter().any(|p| base.starts_with(p)) {
+            continue;
+        }
+        nodes.push(format!("/dev/{name}"));
+    }
+    nodes
+}
+
+/// Programs that have one of the device's data files open: "name (pid)".
+fn holders(dir: &Path) -> Vec<String> {
+    let nodes = data_nodes(dir);
+    let mut found = Vec::new();
+    let Ok(procs) = fs::read_dir("/proc") else { return found };
+    for p in procs.flatten() {
+        let Some(pid) = p.file_name().to_str().and_then(|s| s.parse::<u32>().ok()) else { continue };
+        if pid == std::process::id() {
+            continue;
+        }
+        let Ok(fds) = fs::read_dir(p.path().join("fd")) else { continue };
+        if fds.flatten().any(|fd| fs::read_link(fd.path()).is_ok_and(|t| nodes.iter().any(|n| Path::new(n) == t))) {
+            let name = read(&p.path(), "comm").unwrap_or_else(|| "?".into());
+            let entry = format!("{name} ({pid})");
+            if !found.contains(&entry) {
+                found.push(entry);
+            }
+        }
+    }
+    found
+}
+
+/// Refuses to take a device away from a program that uses it (as Windows does).
+fn check_not_in_use(dir: &Path) -> Result<()> {
+    let holders = holders(dir);
+    if holders.is_empty() {
+        return Ok(());
+    }
+    let via_media_server = holders.iter().any(|h| ["pipewire", "pulseaudio", "jackd", "jackdbus"].iter().any(|s| h.starts_with(&format!("{s} "))));
+    bail!(
+        "in use on this computer by {}{}",
+        holders.join(", "),
+        if via_media_server { " – a program plays, records or films through it; stop that and the other computer tries again" } else { "" }
+    )
+}
+
 impl Lease {
     pub fn capture(d: &UsbDevice) -> Result<Self> {
         ensure_driver()?;
         let dir = Path::new(DEVICES).join(&d.bus_id);
+        check_not_in_use(&dir)?;
         // Never pull a mounted file system away.
         super::ready::unmount_all(&dir).map_err(|e| anyhow!(e))?;
         let lease = Self { bus_id: d.bus_id.clone(), dir };

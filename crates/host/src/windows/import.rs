@@ -58,8 +58,14 @@ pub fn prepare() -> Result<()> {
 pub fn attach(rule: &ImportRule, remote: &UsbDevice) -> Result<(u32, String)> {
     let tcp = rule.port.to_string();
     let before = crate::windows::audio::defaults();
-    let out = usbip(&["-t", &tcp, "attach", "-r", &rule.host, "-b", &remote.busid, "--once", "--terse"])
-        .map_err(|e| anyhow!("{} refused to attach {}: {e}", rule.host, remote.busid))?;
+    let out = usbip(&["-t", &tcp, "attach", "-r", &rule.host, "-b", &remote.busid, "--once", "--terse"]).map_err(|e| {
+        // usbip-win2 says "Device busy (already exported)" for every "busy" answer
+        if e.to_string().starts_with("Device busy") {
+            anyhow!("{} is in use on {} (another client, or a program there holds it)", remote.busid, rule.host)
+        } else {
+            anyhow!("{} refused to attach {}: {e}", rule.host, remote.busid)
+        }
+    })?;
     let port = out.trim().parse().with_context(|| format!("unexpected answer of usbip.exe: {}", out.trim()))?;
     if let Some(before) = before {
         crate::windows::audio::keep(before, crate::import::rule_name(rule));

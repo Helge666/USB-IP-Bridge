@@ -297,6 +297,23 @@ Windows ↔ Windows, Linux ↔ Linux, Linux → Windows genauso zuverlässig wie
 - Offen zu prüfen: isochrones Audio über usbip-win2 (Vollduplex, Latenz), Zusammenspiel von
   usbip-win2 und den VBoxUSB-Treibern auf demselben Windows-Rechner.
 
+### v0.3.0 – macOS (vorgemerkt)
+
+Ziel: Ein Mac nutzt Geräte anderer und gibt eigene frei. Erste Tests auf einem gemieteten
+Cloud-Mac (AWS EC2 Mac, tageweise): dort steckt kein USB-Gerät, deshalb holt sich der Mac Geräte
+aus dem eigenen Netz (über VPN) und gibt sie – **nur in einem Testmodus** – weiter, um auch das
+Freigeben zu prüfen; in Release-Versionen ist das Weitergeben eingebundener Geräte gesperrt
+(siehe v0.2.0, Ausschlüsse). Erst wenn das in der Cloud verlässlich läuft: Tests auf echten
+Macs mit eigenen Geräten.
+
+- Vorher zu klären: Nutzen erfordert einen virtuellen USB-Hostcontroller
+  (IOUSBHostControllerInterface, DriverKit) mit einem von Apple freizuschaltenden Entitlement;
+  isochrone Übertragung (Audio) dort laut Apple bisher nicht unterstützt. Ob und wie sich das
+  auf einem EC2-Mac zum Entwickeln laden lässt (SIP, Developer-Modus für Systemerweiterungen).
+- Freigeben: Gerät per IOKit vom macOS-Treiber übernehmen (Dienst als root).
+- Geräte auflisten (IOKit), Pfade für Konfiguration und Zustand, Systeminfo, Installer (.pkg,
+  launchd-Dienst).
+
 ### Als Nächstes (danach)
 1. Windows-Dienst: beim Stoppen warten, bis verliehene Geräte zurück sind.
 2. Blockierer unter Windows automatisch finden (Prozesse mit offenen Handles auf das Gerät).
@@ -309,7 +326,7 @@ Windows ↔ Windows, Linux ↔ Linux, Linux → Windows genauso zuverlässig wie
 
 ### Später
 - **Internet**: QUIC, NAT-Traversal, Verschlüsselung des Datenpfads.
-- **macOS**, **Android** (zunächst nur Export), weitere Sprachen.
+- **Android** (zunächst nur Export), weitere Sprachen.
 
 ---
 

@@ -13,7 +13,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
   English and German (`--lang de|en`, else the system language).
 - Linux can share its devices (kernel driver `usbip-host`): a shared device stays usable
   locally until another computer takes it and gets its normal driver back afterwards;
-  mounted file systems are unmounted first. The Linux package opens TCP 3242 in ufw.
+  mounted file systems are unmounted first. A device a program uses for sound, MIDI,
+  video or its data (also through PipeWire) is not taken away: the other computer is told
+  it is busy and tries again, and this computer says which program holds it.
+  The Linux package opens TCP 3242 in ufw.
 - The app opens where its window was last time (position, size, maximized); on a screen
   that is no longer there it opens at the usual place.
 - Shared devices keep their name while they are not plugged in: the sharing computer
@@ -44,7 +47,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
   name of the paired computer; `usbipb status` even showed its address. It also says now
   when a shared device is not plugged in.
 - A device that waits for its computer no longer writes the same warning to the log every
-  few seconds.
+  few seconds (neither on the computer that waits nor on the one that has the device).
+- Windows: a device that is busy on the other computer said "Device busy (already
+  exported)" even when a program there held it.
 
 ## [0.1.1] – 2026-10-24
 

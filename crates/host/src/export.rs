@@ -263,9 +263,17 @@ fn handle_connection(stream: TcpStream, peer: IpAddr, config: &Config, state: &E
             let lease = match Lease::capture(&device) {
                 Ok(l) => l,
                 Err(e) => {
-                    state.problems.lock().unwrap().insert(problem_key(&device), (format!("{e:#}"), Instant::now(), peer.to_string()));
+                    let text = format!("{e:#}");
+                    let mut problems = state.problems.lock().unwrap();
+                    // the client tries again every few seconds: log the same problem once
+                    let repeated = problems.get(&problem_key(&device)).is_some_and(|(p, t, _)| *p == text && t.elapsed() < Duration::from_secs(30));
+                    problems.insert(problem_key(&device), (text, Instant::now(), peer.to_string()));
+                    drop(problems);
                     // "busy" tells the client that something on this host holds the device.
                     write_import_error(&mut s, op_status::DEV_BUSY)?;
+                    if repeated {
+                        return Ok(());
+                    }
                     return Err(e.context(format!("capture {}", device.display_name())));
                 }
             };
