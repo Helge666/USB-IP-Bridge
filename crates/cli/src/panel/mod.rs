@@ -120,6 +120,9 @@ struct App {
     tree_scroll: usize,
     popup: Option<Popup>,
     message: Option<(String, bool)>,
+    /// An audio device could not come here because the audio rules are not active yet
+    /// (only then the reminder to reload audio is worth showing).
+    audio_wanted: bool,
     /// Pairings already reported (or answered); codes the user closed.
     reported: HashSet<u64>,
     hidden_codes: HashSet<u64>,
@@ -149,6 +152,7 @@ pub fn run() -> Result<()> {
         tree_scroll: 0,
         popup: None,
         message: None,
+        audio_wanted: false,
         reported: HashSet::new(),
         hidden_codes: HashSet::new(),
         quit: false,
@@ -608,7 +612,10 @@ impl App {
 
     fn run_action(&mut self, a: &Action) {
         self.message = Some(match api::call(self.config.api_port, &a.request) {
-            Ok(Response::Error { message }) => (self.tv("failed", &[("action", &a.label), ("error", &message)]), true),
+            Ok(Response::Error { message }) => {
+                self.audio_wanted |= message.contains("audio rules");
+                (self.tv("failed", &[("action", &a.label), ("error", &message)]), true)
+            }
             Ok(_) => (self.tv("done", &[("action", &a.label)]), false),
             Err(e) => (self.tv("failed", &[("action", &a.label), ("error", &format!("{e:#}"))]), true),
         });
@@ -1057,7 +1064,7 @@ impl App {
         match &self.status {
             None => out.push(format!("{}: {}", self.t("serviceDown"), self.t("serviceDownText"))),
             Some(s) => {
-                if s.audio_rules.is_some_and(|a| !a.active) {
+                if self.audio_wanted && s.audio_rules.is_some_and(|a| !a.active) {
                     out.push(self.t("audioRulesTitle").into());
                 }
                 for e in s.exports.iter().filter(|e| e.problem.is_some()) {

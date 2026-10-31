@@ -206,9 +206,13 @@ function riskyConfirm(d) {
   return t("confirmShare", { device: d.name, warnings: risky.map((w) => "⚠ " + t("warnText_" + w)).join("\n") });
 }
 
+// An audio device could not come here because the audio rules are not active yet (only
+// then the reminder to reload audio is worth showing).
+let audioWanted = false;
+
 async function runAction(a) {
   if (a.confirm && !confirm(a.confirm)) return;
-  try { await a.run(); } catch (e) { alert(String(e)); }
+  try { await a.run(); } catch (e) { audioWanted ||= String(e).includes("audio rules"); alert(String(e)); }
   refresh();
 }
 
@@ -643,7 +647,7 @@ async function reloadAudio(button) {
 function renderAlerts() {
   const box = document.getElementById("alerts");
   const alerts = [];
-  if (status && status.audio_rules && !status.audio_rules.active) {
+  if (audioWanted && status && status.audio_rules && !status.audio_rules.active) {
     alerts.push(el("div", { class: "alert" }, el("div", { class: "dot warn" }),
       el("div", { class: "main" }, el("div", { class: "title" }, t("audioRulesTitle")), el("div", {}, t("audioRulesText"))),
       el("button", { onclick: (ev) => reloadAudio(ev.currentTarget) }, t("reloadAudio"))));

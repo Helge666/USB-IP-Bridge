@@ -50,6 +50,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
   few seconds (neither on the computer that waits nor on the one that has the device).
 - Windows: a device that is busy on the other computer said "Device busy (already
   exported)" even when a program there held it.
+- Linux: right after installing, the app asked to reload audio although no audio device
+  was coming; it asks only when one could not come because of it (the service reloads
+  audio by itself while none is in use).
 
 ## [0.1.1] – 2026-10-24
 
