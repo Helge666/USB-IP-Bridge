@@ -4,6 +4,10 @@ USB-Geräte eines anderen Computers über das Netzwerk nutzen, als wären sie di
 
 *[English](README.md)*
 
+**Download:** [Windows 10 / 11](https://github.com/Helge666/USB-IP-Bridge/releases/latest/download/USB-IP-Bridge_0.2.0_x64-setup.exe)
+· [Linux (Debian, Ubuntu)](https://github.com/Helge666/USB-IP-Bridge/releases/latest/download/USB-IP-Bridge_0.2.0_amd64.deb)
+· [alle Versionen](https://github.com/Helge666/USB-IP-Bridge/releases) – danach siehe [Installieren](#installieren).
+
 Dein Audio-Interface hängt am Windows-PC, aber aufnehmen willst du am Linux-PC? Mit
 USB-IP-Bridge holt sich der Linux-PC das Gerät über das Netzwerk und gibt es zurück, wenn du
 fertig bist. Das klappt mit Audio- und MIDI-Interfaces, Kameras, Grafiktabletts,
@@ -16,7 +20,7 @@ Synthesizern, Laufwerken und den meisten anderen USB-Geräten.
 - Basiert auf USB/IP: Unter Linux arbeiten die Treiber des Kernels, unter Windows signierte
   Treiber (usbipd-win, usbip-win2).
 
-<p align="center"><img src="docs/screenshot.png" width="520" alt="USB-IP-Bridge auf einem Windows-PC: seine USB-Geräte (einige freigegeben, einige gesperrt, drei von einem Linux-PC benutzt), zwei gekoppelte Linux-PCs und die Details dieses Computers"></p>
+<p align="center"><img src="docs/screenshot.png" width="520" alt="USB-IP-Bridge auf einem Windows-PC: seine USB-Geräte (die meisten freigegeben, einige gesperrt), ein zweiter Windows-PC und drei gekoppelte Linux-PCs, dazu die Details eines davon, der eigene Geräte teilt und die anderer nutzt"></p>
 
 > **Stand: v0.2.0.** Jeder Computer kann eigene Geräte teilen und die anderer nutzen,
 > zwischen Windows und Linux in alle Richtungen. Täglich im Einsatz mit einem Behringer XR18
