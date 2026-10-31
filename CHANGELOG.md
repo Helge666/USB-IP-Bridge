@@ -18,8 +18,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
   that is no longer there it opens at the usual place.
 - Shared devices keep their name while they are not plugged in: the sharing computer
   remembers them and lists them as "not there" (also to other computers).
-- Windows can use devices of other computers, with the usbip-win2 driver installed
-  (https://github.com/vadimgrn/usbip-win2): use here, give back, give to, take back;
+- Windows can use devices of other computers through the usbip-win2 drivers
+  (https://github.com/vadimgrn/usbip-win2, BSD-2-Clause), which the installer now brings
+  along (unless they are there already) and removes again on uninstall: use here, give back, give to, take back;
   the service keeps a device attached across its own restarts. Storage devices are
   ejected the safe way before they are given back; while a file on one is open, the
   device stays and the message names the drive. An audio device of another computer
@@ -35,7 +36,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - After a restart of the service, an attached device showed "attached (?)" instead of its
   bus id; on Linux it could even fail to be taken over once the computer shared devices.
 - Windows installer: an update while the app was open could stop with the service
-  stopped; the app is now closed first.
+  stopped; the app is now closed first. Uninstalling while the app was open stopped
+  halfway (service and drivers removed, the program still there); it is closed first, too.
 - Windows: a lent device that is unplugged ends the session, so the other computer
   waits and takes the device again once it is back (before, it kept a dead device).
 - "In use by" showed the router's name for a computer (e.g. a hex number) instead of the

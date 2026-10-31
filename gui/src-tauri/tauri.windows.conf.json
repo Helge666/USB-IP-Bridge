@@ -9,6 +9,7 @@
       "../../target/release/usbipb-service.exe": "usbipb-service.exe",
       "../../target/release/usbipb.exe": "usbipb.exe",
       "../../target/bundle-extra/usbipd-win.msi": "usbipd-win.msi",
+      "../../target/bundle-extra/usbip-win2-setup.exe": "usbip-win2-setup.exe",
       "../../target/bundle-extra/THIRD-PARTY.txt": "THIRD-PARTY.txt"
     },
     "windows": {

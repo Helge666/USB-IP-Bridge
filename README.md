@@ -25,8 +25,8 @@ most other USB devices.
 
 | Platform | Share its devices | Use devices of others |
 |----------|-------------------|-----------------------|
-| Windows 10 / 11, x64 (tested on 11) | ✅ | planned |
-| Linux x64 with systemd (tested on Ubuntu 24.04) | planned | ✅ |
+| Windows 10 / 11, x64 (tested on 11) | ✅ | ✅ |
+| Linux x64 with systemd (tested on Ubuntu 24.04) | ✅ | ✅ |
 | macOS, Android | later | later |
 
 ## Install
@@ -35,7 +35,9 @@ Download the installer from the [releases](https://github.com/Helge666/USB-IP-Br
 
 **Windows:** run `USB-IP-Bridge_0.1.1_x64-setup.exe`. It installs the app, the background
 service and firewall rules for private networks. For its USB drivers it also installs
-[usbipd-win](https://github.com/dorssel/usbipd-win), unless it is already there.
+[usbipd-win](https://github.com/dorssel/usbipd-win) (to share devices) and
+[usbip-win2](https://github.com/vadimgrn/usbip-win2) (to use devices of other computers),
+unless they are already there.
 
 **Linux (Debian, Ubuntu and derivatives):**
 
@@ -52,8 +54,9 @@ This installs the app (menu entry "USB-IP-Bridge"), the service and the virtual 
    others can be added by name or address).
 3. **Pair** the computers once: select the other computer, choose *Pair…* and type the code
    shown on this computer into the app on the other computer.
-4. On Windows, select a device and choose *Give to …* (or *Share*). On Linux, select a shared
-   device of the other computer and choose *Use here*. *Give back* / *Take back* returns it.
+4. On the computer the device is plugged into, select it and choose *Give to …* (or *Share*).
+   On the other computer, select the shared device and choose *Use here*. *Give back* /
+   *Take back* returns it.
 
 For programs that need a device only while they run, the command line can bring it and give
 it back afterwards:
@@ -91,8 +94,8 @@ Configuration (optional): `C:\ProgramData\USB-IP-Bridge\config.toml` on Windows,
 
 ## Uninstall
 
-Windows: *Settings → Apps → USB-IP-Bridge → Uninstall* (also removes usbipd-win if it came
-with USB-IP-Bridge). Linux: `sudo apt remove usb-ip-bridge` (`purge` also removes the key and
+Windows: *Settings → Apps → USB-IP-Bridge → Uninstall* (also removes usbipd-win and
+usbip-win2 if they came with USB-IP-Bridge). Linux: `sudo apt remove usb-ip-bridge` (`purge` also removes the key and
 the list of paired computers).
 
 ## Build from source
