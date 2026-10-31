@@ -13,13 +13,16 @@ most other USB devices.
 - A simple app: share a device, give it to another computer, take it back.
 - Paired computers only: computers are paired once with a 6-digit code; the connection
   between them is encrypted.
-- Built on USB/IP: the Linux kernel's own driver handles the device on the receiving side.
+- Built on USB/IP: on Linux the kernel's own drivers do the work, on Windows signed drivers
+  (usbipd-win, usbip-win2).
 
 <p align="center"><img src="docs/screenshot.png" width="520" alt="USB-IP-Bridge on a Windows PC: its USB devices (some shared, some locked, three in use by a Linux PC), two paired Linux PCs and the details of this computer"></p>
 
-> **Status: v0.1.1, the first public version.** It is used daily with a Behringer XR18
-> (18×18 audio, full duplex, ~26 ms round trip over wired Ethernet) and tested with MIDI
-> interfaces, a webcam, a drawing tablet, a synthesizer and USB sticks. Expect rough edges.
+> **Status: v0.2.0.** Every computer can share its devices and use those of others, between
+> Windows and Linux in all directions. It is used daily with a Behringer XR18 (18×18 audio,
+> full duplex, ~26 ms round trip over wired Ethernet) and tested with MIDI interfaces,
+> webcams, a drawing tablet, a synthesizer, headsets, a mouse, USB sticks and disks. Expect
+> rough edges.
 
 ## What works where
 
@@ -33,7 +36,7 @@ most other USB devices.
 
 Download the installer from the [releases](https://github.com/Helge666/USB-IP-Bridge/releases).
 
-**Windows:** run `USB-IP-Bridge_0.1.1_x64-setup.exe`. It installs the app, the background
+**Windows:** run `USB-IP-Bridge_0.2.0_x64-setup.exe`. It installs the app, the background
 service and firewall rules for private networks. For its USB drivers it also installs
 [usbipd-win](https://github.com/dorssel/usbipd-win) (to share devices) and
 [usbip-win2](https://github.com/vadimgrn/usbip-win2) (to use devices of other computers),
@@ -42,10 +45,11 @@ unless they are already there.
 **Linux (Debian, Ubuntu and derivatives):**
 
 ```bash
-sudo apt install ./USB-IP-Bridge_0.1.1_amd64.deb
+sudo apt install ./USB-IP-Bridge_0.2.0_amd64.deb
 ```
 
-This installs the app (menu entry "USB-IP-Bridge"), the service and the virtual USB host controller.
+This installs the app (menu entry "USB-IP-Bridge"), the service, the USB/IP kernel modules and
+a firewall rule (ufw) for other computers.
 
 ## First steps
 
@@ -71,8 +75,9 @@ usbipb run --device 1397:00d4 -- my-daw
   it is gone on its own computer.
 - The network matters: audio interfaces and cameras want a wired connection (Gigabit
   recommended); Wi-Fi works for MIDI, tablets and the like.
-- Programs that keep a device open (for example a vendor's control panel) prevent sharing it;
-  the app offers to close them and starts them again when the device is back.
+- Programs that keep a device open (for example a vendor's control panel, or a recording)
+  prevent sharing it. On Windows the app offers to close them and starts them again when the
+  device is back; on Linux it names the program.
 - Keyboards, mice, network adapters and Bluetooth adapters are locked automatically, so they are
   not given away by accident. Right-click a device to lock or unlock it.
 - Windows: the network has to be set to *private* (Settings → Network → Properties); in a
@@ -95,8 +100,8 @@ Configuration (optional): `C:\ProgramData\USB-IP-Bridge\config.toml` on Windows,
 ## Uninstall
 
 Windows: *Settings → Apps → USB-IP-Bridge → Uninstall* (also removes usbipd-win and
-usbip-win2 if they came with USB-IP-Bridge). Linux: `sudo apt remove usb-ip-bridge` (`purge` also removes the key and
-the list of paired computers).
+usbip-win2 if they came with USB-IP-Bridge). Linux: `sudo apt remove usb-ip-bridge`
+(`purge` also removes the key and the list of paired computers).
 
 ## Build from source
 

@@ -13,37 +13,43 @@ Synthesizern, Laufwerken und den meisten anderen USB-Geräten.
 - Eine einfache App: Gerät freigeben, an einen anderen Computer geben, zurückholen.
 - Nur gekoppelte Computer: Die Computer werden einmalig mit einem 6-stelligen Code
   gekoppelt; die Verbindung zwischen ihnen ist verschlüsselt.
-- Basiert auf USB/IP: Auf der empfangenden Seite kümmert sich der Treiber des Linux-Kernels um das Gerät.
+- Basiert auf USB/IP: Unter Linux arbeiten die Treiber des Kernels, unter Windows signierte
+  Treiber (usbipd-win, usbip-win2).
 
 <p align="center"><img src="docs/screenshot.png" width="520" alt="USB-IP-Bridge auf einem Windows-PC: seine USB-Geräte (einige freigegeben, einige gesperrt, drei von einem Linux-PC benutzt), zwei gekoppelte Linux-PCs und die Details dieses Computers"></p>
 
-> **Stand: v0.1.1, die erste öffentliche Version.** Täglich im Einsatz mit einem Behringer
-> XR18 (18×18 Audio, Vollduplex, ~26 ms Rundweg über kabelgebundenes Ethernet), getestet mit
-> MIDI-Interfaces, Webcam, Grafiktablett, Synthesizer und USB-Sticks. Mit Ecken und Kanten ist zu rechnen.
+> **Stand: v0.2.0.** Jeder Computer kann eigene Geräte teilen und die anderer nutzen,
+> zwischen Windows und Linux in alle Richtungen. Täglich im Einsatz mit einem Behringer XR18
+> (18×18 Audio, Vollduplex, ~26 ms Rundweg über kabelgebundenes Ethernet), getestet mit
+> MIDI-Interfaces, Webcams, Grafiktablett, Synthesizer, Headsets, Maus, USB-Sticks und
+> Festplatten. Mit Ecken und Kanten ist zu rechnen.
 
 ## Was geht wo
 
 | System | Eigene Geräte teilen | Geräte anderer nutzen |
 |--------|----------------------|-----------------------|
-| Windows 10 / 11, x64 (getestet mit 11) | ✅ | geplant |
-| Linux x64 mit systemd (getestet mit Ubuntu 24.04) | geplant | ✅ |
+| Windows 10 / 11, x64 (getestet mit 11) | ✅ | ✅ |
+| Linux x64 mit systemd (getestet mit Ubuntu 24.04) | ✅ | ✅ |
 | macOS, Android | später | später |
 
 ## Installieren
 
 Den Installer gibt es bei den [Releases](https://github.com/Helge666/USB-IP-Bridge/releases).
 
-**Windows:** `USB-IP-Bridge_0.1.1_x64-setup.exe` ausführen. Er installiert die App, den
+**Windows:** `USB-IP-Bridge_0.2.0_x64-setup.exe` ausführen. Er installiert die App, den
 Hintergrunddienst und Firewall-Regeln für private Netzwerke. Für die USB-Treiber installiert
-er außerdem [usbipd-win](https://github.com/dorssel/usbipd-win), falls es noch fehlt.
+er außerdem [usbipd-win](https://github.com/dorssel/usbipd-win) (zum Teilen) und
+[usbip-win2](https://github.com/vadimgrn/usbip-win2) (zum Nutzen von Geräten anderer
+Computer), falls sie noch fehlen.
 
 **Linux (Debian, Ubuntu und Verwandte):**
 
 ```bash
-sudo apt install ./USB-IP-Bridge_0.1.1_amd64.deb
+sudo apt install ./USB-IP-Bridge_0.2.0_amd64.deb
 ```
 
-Das installiert die App (Menüeintrag „USB-IP-Bridge“), den Dienst und den virtuellen USB-Host-Controller.
+Das installiert die App (Menüeintrag „USB-IP-Bridge“), den Dienst, die USB/IP-Kernelmodule
+und eine Firewall-Regel (ufw) für andere Computer.
 
 ## Erste Schritte
 
@@ -52,8 +58,8 @@ Das installiert die App (Menüeintrag „USB-IP-Bridge“), den Dienst und den v
    andere lassen sich per Name oder Adresse hinzufügen).
 3. Die Computer einmalig **koppeln**: den anderen Computer wählen, *Koppeln…* und den hier
    angezeigten Code in der App auf dem anderen Computer eingeben.
-4. Unter Windows ein Gerät wählen und *An … geben* (oder *Freigeben*). Unter Linux ein
-   freigegebenes Gerät des anderen Computers wählen und *Hierher holen*. *Zurückgeben* /
+4. Am Computer, an dem das Gerät steckt, es wählen und *An … geben* (oder *Freigeben*). Am
+   anderen Computer das freigegebene Gerät wählen und *Hierher holen*. *Zurückgeben* /
    *Zurückholen* bringt es wieder zurück.
 
 Für Programme, die ein Gerät nur brauchen, solange sie laufen, holt die Kommandozeile es
@@ -69,9 +75,9 @@ usbipb run --device 1397:00d4 -- meine-daw
   benutzt, fehlt es am eigenen Computer.
 - Das Netzwerk zählt: Audio-Interfaces und Kameras wollen ein Kabel (Gigabit empfohlen);
   für MIDI, Tabletts und Ähnliches reicht WLAN.
-- Programme, die ein Gerät offen halten (z. B. das Kontrollfeld des Herstellers),
-  verhindern das Teilen; die App bietet an, sie zu beenden, und startet sie wieder, wenn das
-  Gerät zurück ist.
+- Programme, die ein Gerät offen halten (z. B. das Kontrollfeld des Herstellers oder eine
+  laufende Aufnahme), verhindern das Teilen. Unter Windows bietet die App an, sie zu beenden,
+  und startet sie wieder, wenn das Gerät zurück ist; unter Linux nennt sie das Programm.
 - Tastaturen, Mäuse, Netzwerk- und Bluetooth-Adapter sind automatisch gesperrt, damit sie nicht
   aus Versehen weggegeben werden. Rechtsklick auf ein Gerät sperrt oder entsperrt es.
 - Windows: Das Netzwerk muss auf *privat* stehen (Einstellungen → Netzwerk → Eigenschaften); in
@@ -93,9 +99,9 @@ Konfiguration (optional): `C:\ProgramData\USB-IP-Bridge\config.toml` unter Windo
 
 ## Deinstallieren
 
-Windows: *Einstellungen → Apps → USB-IP-Bridge → Deinstallieren* (entfernt auch usbipd-win,
-falls es mit USB-IP-Bridge kam). Linux: `sudo apt remove usb-ip-bridge` (`purge` entfernt
-zusätzlich den Schlüssel und die Liste der gekoppelten Computer).
+Windows: *Einstellungen → Apps → USB-IP-Bridge → Deinstallieren* (entfernt auch usbipd-win
+und usbip-win2, falls sie mit USB-IP-Bridge kamen). Linux: `sudo apt remove usb-ip-bridge`
+(`purge` entfernt zusätzlich den Schlüssel und die Liste der gekoppelten Computer).
 
 ## Selbst bauen
 

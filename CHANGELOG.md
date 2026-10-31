@@ -4,7 +4,10 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.2.0] – 2026-10-31
+
+Every computer can share its devices and use those of others, between Windows and Linux in
+all directions.
 
 ### Added
 - `usbipb panel`: an interactive panel for the terminal with what the app offers –
@@ -53,6 +56,14 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Linux: right after installing, the app asked to reload audio although no audio device
   was coming; it asks only when one could not come because of it (the service reloads
   audio by itself while none is in use).
+
+### Known limitations
+- Windows using an audio interface of another computer: microphones, headsets and USB
+  sound adapters work; a high-speed interface recording and playing many channels at once
+  (like the XR18) is not proven yet.
+- A camera on an older Linux computer (EHCI controller with small DMA buffers) cannot be
+  used by Windows: its large video transfers do not fit, and the Linux computer drops the
+  connection. Between Linux computers the same camera works.
 
 ## [0.1.1] – 2026-10-24
 

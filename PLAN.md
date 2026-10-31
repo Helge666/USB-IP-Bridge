@@ -1,6 +1,6 @@
 # USB-IP-Bridge – Projektplan
 
-> Stand: 2026-10-24 · v0.1.1 (erste öffentliche Version)
+> Stand: 2026-10-31 · v0.2.0 (alle Richtungen)
 
 ---
 
@@ -273,8 +273,13 @@ Rechner/Gerät, lokale Benutzerrechte, Security-Review, Fuzzing.
   (Windows-Setup mit Dienst, Firewall und usbipd-win; Linux-.deb), Einführung beim ersten Start.
 - **v0.1.1 (2026-10-24):** Rechner-Details (Betriebssystem, CPU, Grafik, RAM), automatische
   Sperren für wichtige Geräte plus Sperren/Entsperren per Rechtsklick.
+- **v0.2.0 (2026-10-31) – alle Richtungen:** Jeder Rechner gibt eigene Geräte frei und nutzt
+  die anderer (Details unten). Getestet Windows→Windows, Linux→Linux, Linux→Windows und
+  Windows→Linux mit Audio, MIDI, Video, Eingabe und Speicher; dazu `usbipb panel`,
+  Fensterposition merken, Namen nicht eingesteckter Geräte. Offen: High-Speed-Audio mit
+  vielen Kanälen in Vollduplex nach Windows (z. B. XR18); Webcam-Befund siehe unten.
 
-### v0.2.0 – alle Richtungen
+### v0.2.0 – alle Richtungen (erledigt)
 
 Ziel: Jeder Rechner kann eigene Geräte freigeben **und** Geräte anderer nutzen –
 Windows ↔ Windows, Linux ↔ Linux, Linux → Windows genauso zuverlässig wie heute Windows → Linux.
@@ -296,6 +301,11 @@ Windows ↔ Windows, Linux ↔ Linux, Linux → Windows genauso zuverlässig wie
   Audio (isochron, Vollduplex), MIDI, Video (USB 3), Eingabe, Speicher.
 - Offen zu prüfen: isochrones Audio über usbip-win2 (Vollduplex, Latenz), Zusammenspiel von
   usbip-win2 und den VBoxUSB-Treibern auf demselben Windows-Rechner.
+- Befund (2026-10-31): Eine High-Speed-Webcam an einem älteren Linux-Laptop (EHCI, 16 GB RAM)
+  geht an Linux (720p/10 fps, 480p/30 fps), aber nicht an Windows: Windows fordert
+  isochrone Blöcke von ~380 KB an, der Kernel muss sie über swiotlb umkopieren (höchstens
+  256 KB am Stück) – „swiotlb buffer is full“, usbip-host beendet die Verbindung. Mit einem
+  neueren Linux-Rechner (64-Bit-DMA, xHCI) gegenprüfen.
 
 ### v0.3.0 – macOS (vorgemerkt)
 
